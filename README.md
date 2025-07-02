@@ -1,226 +1,195 @@
 # 🛡️ PocketGuardian
 
-Eine intelligente React Native Expo-App für automatische Sicherheitsfotografie bei Bewegungserkennung.
+**Eine intelligente React Native Expo App für persönliche Sicherheit mit Dual-Kamera-Notfallerkennung**
 
-## 📋 Funktionen
+PocketGuardian ist eine innovative Sicherheits-App, die mithilfe von Bewegungssensoren und Dual-Kamera-Technologie automatisch Notfallsituationen erkennt und entsprechende Maßnahmen einleitet.
 
-### Kernfunktionen
-- **📱 Bewegungserkennung**: Automatische Erkennung unerwarteter Gerätebewegungen
-- **📸 Automatische Aufnahme**: Sofortige Fotoaufnahme bei erkannter Bewegung
-- **📧 E-Mail-Benachrichtigungen**: Automatische E-Mail-Versendung an Notfallkontakte
-- **📱 SMS-Benachrichtigungen**: SMS-Versendung an Notfallkontakte (simuliert)
-- **🌙 Dark Mode**: Vollständige Dark/Light Mode Unterstützung
-- **⚙️ Anpassbare Einstellungen**: Konfigurierbare Sensor-Empfindlichkeit
+## ✨ Hauptfeatures
 
-### ✨ Neue E-Mail-Funktionen
-- **✉️ Notfall-E-Mails**: Automatische E-Mail-Versendung mit Foto-Anhang
-- **🧪 Test-E-Mails**: Test-Funktion für Notfallkontakte
-- **📧 HTML-E-Mails**: Professionell formatierte E-Mail-Templates
-- **📍 Standort-Information**: GPS-Koordinaten in Notfall-E-Mails (falls verfügbar)
-- **⏰ Zeitstempel**: Genaue Zeitangaben für alle Notfall-Events
-- **Dark Mode Support** mit angepassten Themes
-- **Cross-Platform** für Android & iOS optimiert
+### 🔒 **Intelligente Pocket-Erkennung**
+- **Auto-Mode**: Automatische Aktivierung, wenn das Handy in der Tasche ist
+- **Bewegungsmuster-Analyse**: Erkennt ohne echten Lichtsensor, ob sich das Gerät in der Tasche befindet
+- **Smart-Deaktivierung**: Schaltet sich automatisch ab, wenn das Handy verwendet wird
 
-## 🏗️ Projektstruktur
+### 📱 **Dual-Kamera-Notfallsystem**
+- **Vorder- und Rückkamera**: Simultane Aufnahme für vollständige Dokumentation
+- **Crash-resistente Aufnahme**: Fallback-Mechanismen, falls eine Kamera nicht verfügbar ist
+- **Intelligente Kamera-Erkennung**: Automatische Anpassung an verfügbare Hardware
 
+### 🔄 **Extrem unempfindliche Bewegungserkennung**
+- **Hochschwelliger Sensor**: Nur kräftiges Schütteln löst Alarm aus (Threshold: 25.0)
+- **Strenge Kriterien**: Mehrere Bedingungen müssen gleichzeitig erfüllt sein
+- **Cooldown-System**: Verhindert Fehlalarme durch längere Wartezeiten
+
+### 📧 **E-Mail-Notfallsystem**
+- **Notfallkontakte**: Verwaltung von E-Mail-Notfallkontakten
+- **Automatischer Versand**: Sofortiger E-Mail-Versand mit Foto-Anhängen
+- **Test-Funktionalität**: Möglichkeit, das E-Mail-System zu testen
+
+### 🎨 **Modernes UI/UX Design**
+- **Material Design 3**: Mit React Native Paper
+- **Responsive Design**: Optimiert für verschiedene Bildschirmgrößen
+- **SafeArea-Support**: Sichere Darstellung auf allen Geräten
+- **Statusanzeigen**: Echtzeitinformationen über alle Systemzustände
+
+## 🏗️ Architektur
+
+### **Modulare Service-Architektur**
 ```
 src/
-├── components/          # Wiederverwendbare UI-Komponenten
-├── screens/            # App-Bildschirme (Home, Settings, Alert, Camera)
-├── services/           # Business Logic Services
-│   ├── sensorService.ts      # Bewegungserkennung
-│   ├── cameraService.ts      # Kamerasteuerung
+├── services/           # Core-Services
+│   ├── sensorService.ts       # Bewegungssensor & Pocket-Erkennung
+│   ├── cameraService.ts       # Dual-Kamera-Management
+│   ├── emergencyService.ts    # Notfall-Koordination
+│   ├── emailService.ts        # E-Mail-Versand
 │   ├── notificationService.ts # Push-Benachrichtigungen
-│   ├── emergencyService.ts   # Notfallkontakte
-│   └── backgroundTaskService.ts # Hintergrund-Tasks
-├── navigation/         # React Navigation Setup
-├── theme/             # Dark Mode & Theming
-├── types/             # TypeScript Definitionen
-└── utils/             # Utility-Funktionen
+│   └── backgroundTaskService.ts # Background-Tasks
+├── components/         # UI-Komponenten
+├── screens/           # App-Screens
+├── utils/             # Hilfsfunktionen & Tests
+└── types/             # TypeScript-Definitionen
 ```
+
+### **Background-Task-Unterstützung**
+- **expo-background-fetch**: Kontinuierliche Überwachung im Hintergrund
+- **expo-task-manager**: Effizientes Task-Management
+- **Längere Intervalle**: Optimiert für Batterieverbrauch
 
 ## 🚀 Installation & Setup
 
 ### Voraussetzungen
-
-- Node.js (v16 oder höher)
-- Expo CLI (`npm install -g @expo/cli`)
-- Android Studio (für Android) oder Xcode (für iOS)
+- Node.js 18+
+- Expo CLI
+- React Native Development Environment
 
 ### Installation
+```bash
+# Repository klonen
+git clone https://github.com/IhrUsername/PocketGuardian.git
+cd PocketGuardian
 
-1. **Projekt klonen/herunterladen**
-   ```bash
-   cd PocketGuardian
-   ```
+# Dependencies installieren
+npm install
 
-2. **Dependencies installieren**
-   ```bash
-   npm install
-   ```
+# Expo-Entwicklungsserver starten
+npx expo start
+```
 
-3. **App starten**
-   ```bash
-   npm start
-   ```
+### Entwicklung
+```bash
+# iOS Simulator
+npx expo start --ios
 
-### Benötigte Berechtigungen
+# Android Emulator
+npx expo start --android
 
-Die App benötigt folgende Berechtigungen:
-- **Kamera**: Für automatische Fotoaufnahme
-- **Accelerometer**: Für Bewegungserkennung
-- **Benachrichtigungen**: Für Alarm-Meldungen
-- **Medien-Zugriff**: Zum Speichern der Fotos
-- **Hintergrund-Tasks**: Für kontinuierliche Überwachung
+# Web-Version
+npx expo start --web
+```
+
+## 📱 Unterstützte Plattformen
+
+- ✅ **iOS** (iPhone 6s+)
+- ✅ **Android** (API Level 21+)
+- ✅ **Expo Go** (für Entwicklung)
+- ✅ **Development Builds**
 
 ## 🔧 Konfiguration
 
-### Sensor-Einstellungen
+### Notfallkontakte einrichten
+1. App öffnen
+2. Zu "Einstellungen" navigieren
+3. E-Mail-Kontakte hinzufügen
+4. Test-E-Mail versenden zur Überprüfung
 
-- **Empfindlichkeit**: Niedrig/Mittel/Hoch
-- **Schwellenwerte**: Anpassbar für verschiedene Szenarien
-- **Aktivierung**: Ein-/Ausschaltbar
+### Sensitivität anpassen
+- **Auto-Mode**: Für automatische Pocket-Erkennung
+- **Bewegungsschwelle**: Vorkonfiguriert für optimale Erkennung
+- **Debug-Modus**: Verfügbar für Entwickler
 
-### Notfallkontakte
+## 🧪 Testing
 
-- Name und Telefonnummer (erforderlich)
-- E-Mail-Adresse (optional)
-- Mehrere Kontakte möglich
-
-## 📱 Verwendung
-
-### 1. Erste Einrichtung
-- Öffne die App und erlaube alle Berechtigungen
-- Gehe zu "Einstellungen" und konfiguriere Notfallkontakte
-- Passe Sensor-Empfindlichkeit an deine Bedürfnisse an
-
-### 2. Aktivierung
-- Gehe zum Home-Screen
-- Aktiviere die "Bewegungsüberwachung"
-- Die App überwacht nun kontinuierlich Bewegungen
-
-### 3. Bei Bewegungserkennung
-- Automatische Benachrichtigung über erkannte Bewegung
-- 5-Sekunden Countdown für manuellen Abbruch
-- Automatische Fotoaufnahme
-- Versand an alle konfigurierten Notfallkontakte
-
-## 🔍 Testing
-
-### System-Test
-- Nutze den "System-Test" Button im Home-Screen
-- Testet alle Services und Benachrichtigungen
-- Prüft Background-Funktionalität
-
-### Bewegungstest
-- Aktiviere die Überwachung
-- Nutze "Bewegung testen" für Simulation
-- Schüttle das Gerät für echte Bewegungserkennung
-
-## 🛠️ Entwicklung
-
-### Services
-
-#### SensorService
-```typescript
-// Bewegungsüberwachung starten
-sensorService.startMonitoring(onMotionDetected);
-
-// Einstellungen aktualisieren
-sensorService.updateSettings({
-  sensitivity: 'high',
-  isEnabled: true
-});
+### Integrierte Test-Tools
+```javascript
+// Konsolen-Tests verfügbar
+global.NewFeaturesTester.testPocketDetection();
+global.NewFeaturesTester.testCameraDual();
+global.AppTester.testEmergencyFlow();
 ```
 
-#### CameraService  
-```typescript
-// Foto automatisch aufnehmen
-const image = await cameraService.capturePhoto();
+### E-Mail-System testen
+- Test-Button in der App verwenden
+- Dummy-Fotos werden angehängt
+- Überprüfung der Kontakt-Konfiguration
 
-// Berechtigungen prüfen
-const permissions = cameraService.getPermissionStatus();
+## 📚 Dokumentation
+
+- [`KOMPONENTEN_UEBERSICHT.md`](./KOMPONENTEN_UEBERSICHT.md) - Vollständige Architektur-Dokumentation
+- [`NEUE_FEATURES.md`](./NEUE_FEATURES.md) - Feature-Übersicht
+- [`UPDATES.md`](./UPDATES.md) - Changelog
+
+## 🔧 Technische Details
+
+### Dependencies
+```json
+{
+  "expo": "~52.0.0",
+  "react-native": "0.76.1",
+  "expo-router": "~4.0.0",
+  "react-native-paper": "^5.12.5",
+  "expo-camera": "~16.0.0",
+  "expo-sensors": "~14.0.0",
+  "expo-mail-composer": "~13.0.0",
+  "expo-background-fetch": "~13.0.0",
+  "expo-task-manager": "~12.0.0"
+}
 ```
 
-#### EmergencyService
-```typescript
-// Notfall-Prozedur starten
-const result = await emergencyService.executeEmergencyProcedure(
-  image, 
-  emergencyContacts
-);
-```
+### Schlüssel-Features in der Entwicklung
+- **TypeScript**: Vollständige Typsicherheit
+- **Expo Router**: File-based Routing
+- **React Native Paper**: Material Design 3 UI
+- **Modular Architecture**: Saubere Trennung von Concerns
 
-### Theme-System
-
-Dark Mode wird automatisch basierend auf System-Einstellungen aktiviert:
-
-```typescript
-const { isDarkMode, toggleTheme } = useAppTheme();
-```
-
-## 📦 Build & Deployment
-
-### Development Build
-```bash
-expo start
-```
-
-### Production Build
-```bash
-# Android
-expo build:android
-
-# iOS  
-expo build:ios
-```
-
-### EAS Build (empfohlen)
-```bash
-# Einmalig: EAS CLI installieren
-npm install -g eas-cli
-
-# Build konfigurieren
-eas build:configure
-
-# Build starten
-eas build --platform android
-eas build --platform ios
-```
-
-## 🔒 Sicherheit & Datenschutz
-
-- **Lokale Speicherung**: Alle Fotos werden lokal gespeichert
-- **Keine Cloud-Uploads**: Bilder verlassen das Gerät nur über Notfallkontakte
-- **Berechtigungen**: Minimale erforderliche Berechtigungen
-- **Open Source**: Vollständig transparenter Code
-
-## ⚠️ Bekannte Einschränkungen
-
-- **iOS Background**: Eingeschränkte Hintergrund-Ausführung
-- **Batterieoptimierung**: Kann Background-Tasks beeinträchtigen  
-- **Sensor-Genauigkeit**: Abhängig von Gerätehardware
-- **Netzwerkabhängigkeit**: Notfallversand benötigt Internetverbindung
-
-## 🤝 Beitragen
+## 🤝 Contributing
 
 1. Fork das Repository
-2. Erstelle einen Feature-Branch (`git checkout -b feature/AmazingFeature`)
-3. Committe deine Änderungen (`git commit -m 'Add some AmazingFeature'`)
-4. Push zum Branch (`git push origin feature/AmazingFeature`)
-5. Öffne eine Pull Request
+2. Feature-Branch erstellen: `git checkout -b feature/AmazingFeature`
+3. Änderungen committen: `git commit -m 'Add AmazingFeature'`
+4. Branch pushen: `git push origin feature/AmazingFeature`
+5. Pull Request erstellen
 
 ## 📄 Lizenz
 
-Dieses Projekt steht unter der MIT-Lizenz. Siehe `LICENSE` Datei für Details.
+Dieses Projekt steht unter der [MIT Lizenz](LICENSE).
+
+## 👨‍💻 Entwicklung
+
+Entwickelt mit ❤️ unter Verwendung von:
+- **React Native** mit **Expo**
+- **TypeScript** für Typsicherheit
+- **React Native Paper** für Material Design
+- **Expo Router** für Navigation
+- **expo-sensors** für Bewegungserkennung
+- **expo-camera** für Dual-Kamera-Support
+- **expo-mail-composer** für E-Mail-Integration
 
 ## 🆘 Support
 
-Bei Problemen oder Fragen:
-- Öffne ein Issue auf GitHub
-- Prüfe die Konsolen-Logs für Fehlermeldungen
-- Teste mit "System-Test" Funktion
+Bei Fragen oder Problemen:
+- GitHub Issues erstellen
+- [Expo-Dokumentation](https://docs.expo.dev) konsultieren
+- [React Native Paper Docs](https://reactnativepaper.com) für UI-Komponenten
+
+## 📊 Status
+
+- ✅ **Core-Funktionalität**: Vollständig implementiert
+- ✅ **Dual-Kamera-System**: Funktionsfähig mit Fallbacks
+- ✅ **Pocket-Erkennung**: Auto-Mode implementiert
+- ✅ **E-Mail-Integration**: Voll funktionsfähig
+- ✅ **Background-Tasks**: Optimiert für Batterieverbrauch
+- ✅ **UI/UX**: Material Design 3 implementiert
 
 ---
 
-**Entwickelt mit ❤️ und React Native Expo**
+**⚠️ Wichtiger Hinweis**: Diese App ist für Entwicklungs- und Demonstrationszwecke konzipiert. Für produktive Sicherheitsanwendungen sollten zusätzliche Sicherheitsmaßnahmen und Tests implementiert werden.
