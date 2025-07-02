@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PocketGuardian - Mockup Overview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .main-title {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 16px;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 20px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .description {
+            font-size: 16px;
+            opacity: 0.8;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .mockup-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+
+        .mockup-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .mockup-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .mockup-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .mockup-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .mockup-description {
+            font-size: 16px;
+            opacity: 0.8;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .mockup-button {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .mockup-button:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+        }
+
+        .features {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 40px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 40px;
+        }
+
+        .features-title {
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+
+        .feature-item {
+            text-align: center;
+        }
+
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        .feature-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .feature-description {
+            font-size: 14px;
+            opacity: 0.8;
+            line-height: 1.4;
+        }
+
+        .footer {
+            text-align: center;
+            opacity: 0.7;
+            margin-top: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .main-title {
+                font-size: 36px;
+            }
+            
+            .mockup-grid {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1 class="main-title">🛡️ PocketGuardian</h1>
+            <p class="subtitle">App Mockup Collection</p>
+            <p class="description">
+                Interaktive Mockups der PocketGuardian Sicherheits-App mit intelligenter Bewegungserkennung,
+                automatischer Fotografie und E-Mail-Benachrichtigungen für Notfallkontakte.
+            </p>
+        </div>
+
+        <!-- Mockup Grid -->
+        <div class="mockup-grid">
+            <div class="mockup-card" onclick="window.open('home-screen.html', '_blank')">
+                <span class="mockup-icon">🏠</span>
+                <h3 class="mockup-title">Home Screen</h3>
+                <p class="mockup-description">
+                    Hauptbildschirm mit Status-Übersicht, Bewegungsüberwachung-Toggle und Schnelltests.
+                    Zeigt aktuelle System-Status und bietet direkte Kontrolle über alle Funktionen.
+                </p>
+                <a href="home-screen.html" class="mockup-button" target="_blank">Ansehen</a>
+            </div>
+
+            <div class="mockup-card" onclick="window.open('settings-screen.html', '_blank')">
+                <span class="mockup-icon">⚙️</span>
+                <h3 class="mockup-title">Settings Screen</h3>
+                <p class="mockup-description">
+                    Einstellungsbereich für App-Konfiguration, Sensor-Empfindlichkeit und Notfallkontakte 
+                    mit E-Mail-Adressen und Test-E-Mail-Funktionalität.
+                </p>
+                <a href="settings-screen.html" class="mockup-button" target="_blank">Ansehen</a>
+            </div>
+
+            <div class="mockup-card" onclick="window.open('alert-screen.html', '_blank')">
+                <span class="mockup-icon">🚨</span>
+                <h3 class="mockup-title">Alert Screen</h3>
+                <p class="mockup-description">
+                    Notfall-Bildschirm bei erkannter Bewegung mit automatischem Countdown, 
+                    Foto-Status und Optionen für falschen Alarm oder Notfall-Aktionen.
+                </p>
+                <a href="alert-screen.html" class="mockup-button" target="_blank">Ansehen</a>
+            </div>
+
+            <div class="mockup-card" onclick="window.open('contact-form.html', '_blank')">
+                <span class="mockup-icon">📞</span>
+                <h3 class="mockup-title">Contact Form</h3>
+                <p class="mockup-description">
+                    Formular zum Hinzufügen neuer Notfallkontakte mit Name, Telefonnummer, 
+                    E-Mail-Adresse und Test-E-Mail-Funktionalität.
+                </p>
+                <a href="contact-form.html" class="mockup-button" target="_blank">Ansehen</a>
+            </div>
+
+            <div class="mockup-card" onclick="window.open('dark-mode.html', '_blank')">
+                <span class="mockup-icon">🌙</span>
+                <h3 class="mockup-title">Dark Mode</h3>
+                <p class="mockup-description">
+                    Dunkles Theme der Settings-Seite mit verbesserter Lesbarkeit bei schwachem Licht
+                    und angepassten Kontrasten für alle UI-Elemente.
+                </p>
+                <a href="dark-mode.html" class="mockup-button" target="_blank">Ansehen</a>
+            </div>
+        </div>
+
+        <!-- Features Section -->
+        <div class="features">
+            <h2 class="features-title">✨ Neue E-Mail-Features</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <span class="feature-icon">📧</span>
+                    <h3 class="feature-title">Automatische E-Mails</h3>
+                    <p class="feature-description">
+                        Bei Bewegungserkennung werden automatisch E-Mails mit Foto-Anhang an alle Notfallkontakte gesendet.
+                    </p>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feature-icon">🧪</span>
+                    <h3 class="feature-title">Test-E-Mail-Funktion</h3>
+                    <p class="feature-description">
+                        Testen Sie die E-Mail-Funktionalität jederzeit mit einem Klick auf den Test-Button.
+                    </p>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feature-icon">📱</span>
+                    <h3 class="feature-title">HTML-E-Mail-Templates</h3>
+                    <p class="feature-description">
+                        Professionell gestaltete E-Mail-Vorlagen mit Zeitstempel, Standort und Geräte-Informationen.
+                    </p>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feature-icon">📍</span>
+                    <h3 class="feature-title">Standort-Integration</h3>
+                    <p class="feature-description">
+                        GPS-Koordinaten werden automatisch in Notfall-E-Mails eingebettet (falls verfügbar).
+                    </p>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feature-icon">🖼️</span>
+                    <h3 class="feature-title">Foto-Anhänge</h3>
+                    <p class="feature-description">
+                        Automatisch aufgenommene Sicherheitsfotos werden als Anhang an E-Mails angefügt.
+                    </p>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feature-icon">⚡</span>
+                    <h3 class="feature-title">Schnelle Validierung</h3>
+                    <p class="feature-description">
+                        E-Mail-Adressen werden automatisch validiert und auf Korrektheit geprüft.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>🛡️ PocketGuardian Mockups - Erstellt mit HTML/CSS - Responsives Design</p>
+            <p>Öffnen Sie die Mockups in einem neuen Tab für die beste Erfahrung</p>
+        </div>
+    </div>
+
+    <script>
+        // Keyboard shortcuts for quick navigation
+        document.addEventListener('keydown', function(e) {
+            switch(e.key) {
+                case '1':
+                    window.open('home-screen.html', '_blank');
+                    break;
+                case '2':
+                    window.open('settings-screen.html', '_blank');
+                    break;
+                case '3':
+                    window.open('alert-screen.html', '_blank');
+                    break;
+                case '4':
+                    window.open('contact-form.html', '_blank');
+                    break;
+                case '5':
+                    window.open('dark-mode.html', '_blank');
+                    break;
+            }
+        });
+
+        // Add tooltip for keyboard shortcuts
+        document.body.insertAdjacentHTML('beforeend', `
+            <div style="position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 8px; font-size: 12px;">
+                Shortcuts: 1-5 für Mockups
+            </div>
+        `);
+    </script>
+</body>
+</html>

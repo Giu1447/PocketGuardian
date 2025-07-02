@@ -1,110 +1,533 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+/**
+ * Settings Screen - Einstellungsseite der PocketGuardian App (Expo Router)
+ */
 
-import { Collapsible } from '@/components/Collapsible';
-import { ExternalLink } from '@/components/ExternalLink';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import Slider from '@react-native-community/slider';
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import {
+    Button,
+    Card,
+    Divider,
+    IconButton,
+    SegmentedButtons,
+    Switch,
+    Text,
+    TextInput,
+    useTheme
+} from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { emailService, sensorService } from '../../src/services';
+import { AppSettings, EmergencyContact, SensorSettings } from '../../src/types';
+import { generateId, isValidEmail, isValidPhoneNumber } from '../../src/utils/helpers';
 
-export default function TabTwoScreen() {
+// Dark Mode entfernt - war nicht zuverlässig
+const useAppTheme = () => {
+  return { isDarkMode: false, toggleTheme: () => {} };
+};
+
+export default function SettingsScreen() {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const { isDarkMode, toggleTheme } = useAppTheme();
+  
+  // Einstellungen State (würde normalerweise aus AsyncStorage geladen)
+  const [settings, setSettings] = useState<AppSettings>({
+    darkMode: isDarkMode,
+    emergencyContacts: [
+      {
+        id: '1',
+        name: 'Notfallkontakt 1',
+        phone: '+49123456789',
+        email: 'notfall@example.com'
+      }
+    ],
+    sensorSettings: {
+      threshold: 1.0,
+      isEnabled: true,
+      sensitivity: 'medium'
+    },
+    autoCapture: true
+  });
+
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [newContactEmail, setNewContactEmail] = useState('');
+  const [testEmailStatus, setTestEmailStatus] = useState<string>('');
+
+  useEffect(() => {
+    // In einer echten App würden Einstellungen aus AsyncStorage geladen
+    console.log('Settings loaded:', settings);
+  }, []);
+
+  /**
+   * Speichert die Einstellungen
+   */
+  const saveSettings = async (newSettings: AppSettings) => {
+    try {
+      // In einer echten App würden Einstellungen in AsyncStorage gespeichert
+      setSettings(newSettings);
+      
+      // Sensor-Einstellungen aktualisieren
+      sensorService.updateSettings(newSettings.sensorSettings);
+      
+      console.log('Settings saved:', newSettings);
+    } catch (error) {
+      console.error('Fehler beim Speichern der Einstellungen:', error);
+      Alert.alert('Fehler', 'Einstellungen konnten nicht gespeichert werden');
+    }
+  };
+
+  /**
+   * Dark Mode entfernt - war nicht zuverlässig
+   */
+
+  /**
+   * Auto-Capture umschalten
+   */
+  const toggleAutoCapture = () => {
+    const newSettings = {
+      ...settings,
+      autoCapture: !settings.autoCapture
+    };
+    saveSettings(newSettings);
+  };
+
+  /**
+   * Sensor-Einstellungen aktualisieren
+   */
+  const updateSensorSettings = (newSensorSettings: Partial<SensorSettings>) => {
+    const updatedSettings = {
+      ...settings,
+      sensorSettings: {
+        ...settings.sensorSettings,
+        ...newSensorSettings
+      }
+    };
+    saveSettings(updatedSettings);
+  };
+
+  /**
+   * Neuen Notfallkontakt hinzufügen
+   */
+  const addEmergencyContact = () => {
+    if (!newContactName.trim()) {
+      Alert.alert('Fehler', 'Name ist erforderlich');
+      return;
+    }
+
+    if (!newContactPhone.trim() || !isValidPhoneNumber(newContactPhone)) {
+      Alert.alert('Fehler', 'Gültige Telefonnummer ist erforderlich');
+      return;
+    }
+
+    if (newContactEmail.trim() && !isValidEmail(newContactEmail)) {
+      Alert.alert('Fehler', 'Gültige E-Mail-Adresse ist erforderlich');
+      return;
+    }
+
+    const newContact: EmergencyContact = {
+      id: generateId(),
+      name: newContactName.trim(),
+      phone: newContactPhone.trim(),
+      email: newContactEmail.trim() || undefined
+    };
+
+    const newSettings = {
+      ...settings,
+      emergencyContacts: [...settings.emergencyContacts, newContact]
+    };
+
+    saveSettings(newSettings);
+
+    // Eingabefelder zurücksetzen
+    setNewContactName('');
+    setNewContactPhone('');
+    setNewContactEmail('');
+
+    Alert.alert('Erfolg', 'Notfallkontakt hinzugefügt');
+  };
+
+  /**
+   * Notfallkontakt entfernen
+   */
+  const removeEmergencyContact = (contactId: string) => {
+    Alert.alert(
+      'Kontakt entfernen',
+      'Möchten Sie diesen Notfallkontakt wirklich entfernen?',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'Entfernen',
+          onPress: () => {
+            const newSettings = {
+              ...settings,
+              emergencyContacts: settings.emergencyContacts.filter(c => c.id !== contactId)
+            };
+            saveSettings(newSettings);
+          }
+        }
+      ]
+    );
+  };
+
+  /**
+   * Test-E-Mail senden
+   */
+  const sendTestEmail = async (contact: EmergencyContact) => {
+    if (!contact.email) {
+      Alert.alert('Fehler', 'Keine E-Mail-Adresse für diesen Kontakt hinterlegt');
+      return;
+    }
+
+    try {
+      setTestEmailStatus('Sende Test-E-Mail...');
+      
+      const success = await emailService.sendTestEmail(contact.email);
+      
+      if (success) {
+        setTestEmailStatus('Test-E-Mail erfolgreich gesendet!');
+        Alert.alert('Erfolg', `Test-E-Mail an ${contact.name} gesendet`);
+      } else {
+        setTestEmailStatus('Fehler beim Senden der Test-E-Mail');
+        Alert.alert('Fehler', 'Test-E-Mail konnte nicht gesendet werden');
+      }
+    } catch (error) {
+      console.error('Feher beim Senden der Test-E-Mail:', error);
+      setTestEmailStatus('Fehler beim Senden der Test-E-Mail');
+      Alert.alert('Fehler', 'Test-E-Mail konnte nicht gesendet werden');
+    }
+
+    // Status nach 3 Sekunden zurücksetzen
+    setTimeout(() => setTestEmailStatus(''), 3000);
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <ScrollView style={[
+      styles.container, 
+      { 
+        backgroundColor: theme.colors.background,
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom,
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
+      }
+    ]}>
+      {/* Header */}
+      <Card style={styles.headerCard}>
+        <Card.Content>
+          <Text variant="headlineMedium" style={styles.title}>
+            ⚙️ Einstellungen
+          </Text>
+        </Card.Content>
+      </Card>
+
+      {/* App-Einstellungen */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            App-Einstellungen
+          </Text>
+          
+          {/* Dark Mode entfernt - war nicht zuverlässig */}
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <Text variant="bodyMedium">📸 Auto-Aufnahme</Text>
+              <Text variant="bodySmall" style={styles.settingDescription}>
+                Automatische Fotoaufnahme bei Bewegung
+              </Text>
+            </View>
+            <Switch
+              value={settings.autoCapture}
+              onValueChange={toggleAutoCapture}
+            />
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Sensor-Einstellungen */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            🔧 Sensor-Einstellungen
+          </Text>
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <Text variant="bodyMedium">Sensor aktiviert</Text>
+            </View>
+            <Switch
+              value={settings.sensorSettings.isEnabled}
+              onValueChange={(value) => updateSensorSettings({ isEnabled: value })}
+            />
+          </View>
+
+          <Divider style={styles.divider} />
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <Text variant="bodyMedium" style={styles.settingLabel}>
+                Empfindlichkeit
+              </Text>
+              <Text variant="bodySmall" style={styles.settingDescription}>
+                Niedrig: weniger empfindlich, weniger Fehlalarme{'\n'}
+                Hoch: sehr empfindlich, mehr Erkennungen
+              </Text>
+            </View>
+          </View>
+          <SegmentedButtons
+            value={settings.sensorSettings.sensitivity}
+            onValueChange={(value) => updateSensorSettings({ sensitivity: value as 'low' | 'medium' | 'high' })}
+            buttons={[
+              { value: 'low', label: 'Niedrig' },
+              { value: 'medium', label: 'Mittel' },
+              { value: 'high', label: 'Hoch' }
+            ]}
+            style={styles.segmentedButtons}
+          />
+
+          <Divider style={styles.divider} />
+
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <Text variant="bodyMedium" style={styles.settingLabel}>
+                Schwellenwert: {settings.sensorSettings.threshold.toFixed(1)}
+              </Text>
+              <Text variant="bodySmall" style={styles.settingDescription}>
+                Höherer Wert = weniger empfindlich (1.0 - 5.0)
+              </Text>
+            </View>
+          </View>
+          <Slider
+            style={styles.segmentedButtons}
+            minimumValue={1.0}
+            maximumValue={5.0}
+            step={0.1}
+            value={settings.sensorSettings.threshold}
+            onValueChange={(value) => updateSensorSettings({ threshold: value })}
+            minimumTrackTintColor={theme.colors.primary}
+            maximumTrackTintColor={theme.colors.outline}
+          />
+        </Card.Content>
+      </Card>
+
+      {/* Notfallkontakte */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            🚨 Notfallkontakte
+          </Text>
+
+          {/* Bestehende Kontakte */}
+          {settings.emergencyContacts.map((contact) => (
+            <View key={contact.id} style={styles.contactItem}>
+              <View style={styles.contactItemRow}>
+                <View style={styles.contactInfo}>
+                  <Text variant="bodyMedium" style={styles.contactName}>
+                    {contact.name}
+                  </Text>
+                  <Text variant="bodySmall" style={styles.contactPhone}>
+                    📞 {contact.phone}
+                  </Text>
+                  {contact.email && (
+                    <Text variant="bodySmall" style={styles.contactEmail}>
+                      📧 {contact.email}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.contactActions}>
+                  {contact.email && (
+                    <IconButton
+                      icon="email-send"
+                      mode="contained-tonal"
+                      size={20}
+                      onPress={() => sendTestEmail(contact)}
+                    />
+                  )}
+                  <IconButton
+                    icon="delete"
+                    mode="contained-tonal"
+                    size={20}
+                    onPress={() => removeEmergencyContact(contact.id)}
+                  />
+                </View>
+              </View>
+            </View>
+          ))}
+
+          {/* Test-E-Mail Status */}
+          {testEmailStatus && (
+            <Text variant="bodySmall" style={styles.testEmailStatus}>
+              {testEmailStatus}
+            </Text>
+          )}
+
+          <Divider style={styles.divider} />
+
+          {/* Neuen Kontakt hinzufügen */}
+          <Text variant="titleSmall" style={styles.addContactTitle}>
+            Neuen Kontakt hinzufügen
+          </Text>
+
+          <TextInput
+            label="Name"
+            value={newContactName}
+            onChangeText={setNewContactName}
+            style={styles.input}
+            mode="outlined"
+          />
+
+          <TextInput
+            label="Telefonnummer"
+            value={newContactPhone}
+            onChangeText={setNewContactPhone}
+            style={styles.input}
+            mode="outlined"
+            keyboardType="phone-pad"
+            placeholder="+49123456789"
+          />
+
+          <TextInput
+            label="E-Mail-Adresse (optional)"
+            value={newContactEmail}
+            onChangeText={setNewContactEmail}
+            style={styles.input}
+            mode="outlined"
+            keyboardType="email-address"
+            placeholder="notfall@example.com"
+          />
+
+          <Button
+            mode="contained"
+            onPress={addEmergencyContact}
+            style={styles.addButton}
+            icon="plus"
+          >
+            Kontakt hinzufügen
+          </Button>
+        </Card.Content>
+      </Card>
+
+      {/* Info */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Text variant="titleSmall" style={styles.infoTitle}>
+            ℹ️ Information
+          </Text>
+          <Text variant="bodySmall" style={styles.infoText}>
+            Notfallkontakte werden bei erkannter Bewegung automatisch benachrichtigt.
+            {'\n\n'}
+            Mit einer E-Mail-Adresse können auch E-Mail-Benachrichtigungen mit Fotos gesendet werden.
+            {'\n\n'}
+            Verwenden Sie die Test-E-Mail-Funktion, um die Konfiguration zu überprüfen.
+          </Text>
+        </Card.Content>
+      </Card>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    padding: 12,
   },
-  titleContainer: {
+  headerCard: {
+    marginBottom: 12,
+  },
+  title: {
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  card: {
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    marginBottom: 12,
+    fontWeight: 'bold',
+  },
+  settingItem: {
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    minHeight: 50,
+  },
+  settingLeft: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  settingLabel: {
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  settingDescription: {
+    opacity: 0.7,
+    marginTop: 2,
+    fontSize: 12,
+    flexWrap: 'wrap',
+  },
+  divider: {
+    marginVertical: 12,
+  },
+  segmentedButtons: {
+    marginTop: 8,
+  },
+  contactItem: {
+    flexDirection: 'column',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  contactItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  contactInfo: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  contactName: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  contactPhone: {
+    opacity: 0.8,
+    marginTop: 2,
+    fontSize: 14,
+  },
+  contactEmail: {
+    opacity: 0.8,
+    marginTop: 2,
+    fontSize: 14,
+  },
+  contactActions: {
+    flexDirection: 'row',
+    flexShrink: 0,
+  },
+  testEmailStatus: {
+    textAlign: 'center',
+    marginVertical: 8,
+    fontStyle: 'italic',
+  },
+  addContactTitle: {
+    marginBottom: 12,
+    fontWeight: 'bold',
+  },
+  input: {
+    marginBottom: 8,
+  },
+  addButton: {
+    marginTop: 8,
+  },
+  infoTitle: {
+    marginBottom: 8,
+    fontWeight: 'bold',
+  },
+  infoText: {
+    lineHeight: 20,
+    opacity: 0.8,
   },
 });

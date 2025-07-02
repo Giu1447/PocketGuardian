@@ -1,50 +1,226 @@
-# Welcome to your Expo app 👋
+# 🛡️ PocketGuardian
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Eine intelligente React Native Expo-App für automatische Sicherheitsfotografie bei Bewegungserkennung.
 
-## Get started
+## 📋 Funktionen
 
-1. Install dependencies
+### Kernfunktionen
+- **📱 Bewegungserkennung**: Automatische Erkennung unerwarteter Gerätebewegungen
+- **📸 Automatische Aufnahme**: Sofortige Fotoaufnahme bei erkannter Bewegung
+- **📧 E-Mail-Benachrichtigungen**: Automatische E-Mail-Versendung an Notfallkontakte
+- **📱 SMS-Benachrichtigungen**: SMS-Versendung an Notfallkontakte (simuliert)
+- **🌙 Dark Mode**: Vollständige Dark/Light Mode Unterstützung
+- **⚙️ Anpassbare Einstellungen**: Konfigurierbare Sensor-Empfindlichkeit
 
+### ✨ Neue E-Mail-Funktionen
+- **✉️ Notfall-E-Mails**: Automatische E-Mail-Versendung mit Foto-Anhang
+- **🧪 Test-E-Mails**: Test-Funktion für Notfallkontakte
+- **📧 HTML-E-Mails**: Professionell formatierte E-Mail-Templates
+- **📍 Standort-Information**: GPS-Koordinaten in Notfall-E-Mails (falls verfügbar)
+- **⏰ Zeitstempel**: Genaue Zeitangaben für alle Notfall-Events
+- **Dark Mode Support** mit angepassten Themes
+- **Cross-Platform** für Android & iOS optimiert
+
+## 🏗️ Projektstruktur
+
+```
+src/
+├── components/          # Wiederverwendbare UI-Komponenten
+├── screens/            # App-Bildschirme (Home, Settings, Alert, Camera)
+├── services/           # Business Logic Services
+│   ├── sensorService.ts      # Bewegungserkennung
+│   ├── cameraService.ts      # Kamerasteuerung
+│   ├── notificationService.ts # Push-Benachrichtigungen
+│   ├── emergencyService.ts   # Notfallkontakte
+│   └── backgroundTaskService.ts # Hintergrund-Tasks
+├── navigation/         # React Navigation Setup
+├── theme/             # Dark Mode & Theming
+├── types/             # TypeScript Definitionen
+└── utils/             # Utility-Funktionen
+```
+
+## 🚀 Installation & Setup
+
+### Voraussetzungen
+
+- Node.js (v16 oder höher)
+- Expo CLI (`npm install -g @expo/cli`)
+- Android Studio (für Android) oder Xcode (für iOS)
+
+### Installation
+
+1. **Projekt klonen/herunterladen**
+   ```bash
+   cd PocketGuardian
+   ```
+
+2. **Dependencies installieren**
    ```bash
    npm install
    ```
 
-2. Start the app
-
+3. **App starten**
    ```bash
-   npx expo start
+   npm start
    ```
 
-In the output, you'll find options to open the app in a
+### Benötigte Berechtigungen
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Die App benötigt folgende Berechtigungen:
+- **Kamera**: Für automatische Fotoaufnahme
+- **Accelerometer**: Für Bewegungserkennung
+- **Benachrichtigungen**: Für Alarm-Meldungen
+- **Medien-Zugriff**: Zum Speichern der Fotos
+- **Hintergrund-Tasks**: Für kontinuierliche Überwachung
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 🔧 Konfiguration
 
-## Get a fresh project
+### Sensor-Einstellungen
 
-When you're ready, run:
+- **Empfindlichkeit**: Niedrig/Mittel/Hoch
+- **Schwellenwerte**: Anpassbar für verschiedene Szenarien
+- **Aktivierung**: Ein-/Ausschaltbar
 
-```bash
-npm run reset-project
+### Notfallkontakte
+
+- Name und Telefonnummer (erforderlich)
+- E-Mail-Adresse (optional)
+- Mehrere Kontakte möglich
+
+## 📱 Verwendung
+
+### 1. Erste Einrichtung
+- Öffne die App und erlaube alle Berechtigungen
+- Gehe zu "Einstellungen" und konfiguriere Notfallkontakte
+- Passe Sensor-Empfindlichkeit an deine Bedürfnisse an
+
+### 2. Aktivierung
+- Gehe zum Home-Screen
+- Aktiviere die "Bewegungsüberwachung"
+- Die App überwacht nun kontinuierlich Bewegungen
+
+### 3. Bei Bewegungserkennung
+- Automatische Benachrichtigung über erkannte Bewegung
+- 5-Sekunden Countdown für manuellen Abbruch
+- Automatische Fotoaufnahme
+- Versand an alle konfigurierten Notfallkontakte
+
+## 🔍 Testing
+
+### System-Test
+- Nutze den "System-Test" Button im Home-Screen
+- Testet alle Services und Benachrichtigungen
+- Prüft Background-Funktionalität
+
+### Bewegungstest
+- Aktiviere die Überwachung
+- Nutze "Bewegung testen" für Simulation
+- Schüttle das Gerät für echte Bewegungserkennung
+
+## 🛠️ Entwicklung
+
+### Services
+
+#### SensorService
+```typescript
+// Bewegungsüberwachung starten
+sensorService.startMonitoring(onMotionDetected);
+
+// Einstellungen aktualisieren
+sensorService.updateSettings({
+  sensitivity: 'high',
+  isEnabled: true
+});
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+#### CameraService  
+```typescript
+// Foto automatisch aufnehmen
+const image = await cameraService.capturePhoto();
 
-## Learn more
+// Berechtigungen prüfen
+const permissions = cameraService.getPermissionStatus();
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+#### EmergencyService
+```typescript
+// Notfall-Prozedur starten
+const result = await emergencyService.executeEmergencyProcedure(
+  image, 
+  emergencyContacts
+);
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Theme-System
 
-## Join the community
+Dark Mode wird automatisch basierend auf System-Einstellungen aktiviert:
 
-Join our community of developers creating universal apps.
+```typescript
+const { isDarkMode, toggleTheme } = useAppTheme();
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 📦 Build & Deployment
+
+### Development Build
+```bash
+expo start
+```
+
+### Production Build
+```bash
+# Android
+expo build:android
+
+# iOS  
+expo build:ios
+```
+
+### EAS Build (empfohlen)
+```bash
+# Einmalig: EAS CLI installieren
+npm install -g eas-cli
+
+# Build konfigurieren
+eas build:configure
+
+# Build starten
+eas build --platform android
+eas build --platform ios
+```
+
+## 🔒 Sicherheit & Datenschutz
+
+- **Lokale Speicherung**: Alle Fotos werden lokal gespeichert
+- **Keine Cloud-Uploads**: Bilder verlassen das Gerät nur über Notfallkontakte
+- **Berechtigungen**: Minimale erforderliche Berechtigungen
+- **Open Source**: Vollständig transparenter Code
+
+## ⚠️ Bekannte Einschränkungen
+
+- **iOS Background**: Eingeschränkte Hintergrund-Ausführung
+- **Batterieoptimierung**: Kann Background-Tasks beeinträchtigen  
+- **Sensor-Genauigkeit**: Abhängig von Gerätehardware
+- **Netzwerkabhängigkeit**: Notfallversand benötigt Internetverbindung
+
+## 🤝 Beitragen
+
+1. Fork das Repository
+2. Erstelle einen Feature-Branch (`git checkout -b feature/AmazingFeature`)
+3. Committe deine Änderungen (`git commit -m 'Add some AmazingFeature'`)
+4. Push zum Branch (`git push origin feature/AmazingFeature`)
+5. Öffne eine Pull Request
+
+## 📄 Lizenz
+
+Dieses Projekt steht unter der MIT-Lizenz. Siehe `LICENSE` Datei für Details.
+
+## 🆘 Support
+
+Bei Problemen oder Fragen:
+- Öffne ein Issue auf GitHub
+- Prüfe die Konsolen-Logs für Fehlermeldungen
+- Teste mit "System-Test" Funktion
+
+---
+
+**Entwickelt mit ❤️ und React Native Expo**

@@ -1,29 +1,28 @@
 /**
- * Home Screen - Hauptbildschirm der PocketGuardian App (Expo Router)
+ * Home Screen - Hauptbildschirm der App
  */
 
-import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Button, Card, Surface, Switch, Text, useTheme } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  backgroundTaskService,
-  cameraService,
-  emergencyService,
-  notificationService,
-  sensorService
-} from '../../src/services';
-import { AppSettings, EmergencyContact } from '../../src/types';
+    backgroundTaskService,
+    cameraService,
+    emergencyService,
+    notificationService,
+    sensorService
+} from '../services';
+import { AppSettings, EmergencyContact } from '../types';
 
-export default function HomeScreen() {
+interface HomeScreenProps {
+  navigation: any;
+}
+
+export default function HomeScreen({ navigation }: HomeScreenProps) {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [backgroundStatus, setBackgroundStatus] = useState<string>('Unbekannt');
-  const [isPocketMode, setIsPocketMode] = useState(false);
-  const [autoModeEnabled, setAutoModeEnabled] = useState(false);
 
   // Dummy-Einstellungen (würden normalerweise aus AsyncStorage kommen)
   const [settings] = useState<AppSettings>({
@@ -75,17 +74,8 @@ export default function HomeScreen() {
         Alert.alert('Warnung', 'Benachrichtigungs-Berechtigung nicht erteilt');
       }
 
-      // Konfiguriere Sensor-Einstellungen (SEHR UNSENSIBEL)
-      const unsensitiveSettings = {
-        ...settings.sensorSettings,
-        threshold: 25.0, // Drastisch erhöht für weniger Auslösungen
-        sensitivity: 'low' as const, // Niedrigste Sensitivität
-        isEnabled: true
-      };
-      sensorService.updateSettings(unsensitiveSettings);
-
-      // Setze Pocket-State-Handler für automatische Aktivierung
-      sensorService.setPocketStateHandler(handlePocketStateChange);
+      // Konfiguriere Sensor-Einstellungen
+      sensorService.updateSettings(settings.sensorSettings);
 
       setIsInitialized(true);
       console.log('✅ Services erfolgreich initialisiert');
@@ -102,43 +92,6 @@ export default function HomeScreen() {
   const checkBackgroundStatus = async () => {
     const status = await backgroundTaskService.getBackgroundStatus();
     setBackgroundStatus(status.status);
-  };
-
-  /**
-   * Handler für Pocket-Status-Änderungen (automatische Aktivierung/Deaktivierung)
-   */
-  const handlePocketStateChange = async (inPocket: boolean) => {
-    setIsPocketMode(inPocket);
-    
-    if (!autoModeEnabled) {
-      console.log('💡 Auto-Mode deaktiviert, ignoriere Pocket-Status');
-      return;
-    }
-    
-    console.log(`💡 Pocket-Status: ${inPocket ? 'IM POCKET' : 'DRAUSSEN'}`);
-    
-    if (inPocket && !isMonitoring) {
-      // Automatisch aktivieren wenn im Pocket
-      console.log('🔄 Auto-Aktivierung: Handy im Pocket erkannt');
-      await toggleMonitoring();
-      
-      await notificationService.showLocalNotification({
-        title: '🔄 Auto-Aktiviert',
-        body: 'PocketGuardian wurde automatisch aktiviert (Handy im Pocket)',
-        data: { type: 'auto_activated' }
-      });
-      
-    } else if (!inPocket && isMonitoring && autoModeEnabled) {
-      // Automatisch deaktivieren wenn draußen
-      console.log('⏸️ Auto-Deaktivierung: Handy aus Pocket genommen');
-      await toggleMonitoring();
-      
-      await notificationService.showLocalNotification({
-        title: '⏸️ Auto-Deaktiviert',
-        body: 'PocketGuardian wurde automatisch deaktiviert (Handy aus Pocket)',
-        data: { type: 'auto_deactivated' }
-      });
-    }
   };
 
   /**
@@ -197,13 +150,10 @@ export default function HomeScreen() {
       // Benachrichtige über Bewegungserkennung
       await notificationService.notifyMotionDetected();
       
-      // Navigiere zum Alert-Screen mit Expo Router
-      router.push({
-        pathname: '/alert',
-        params: {
-          type: 'motion',
-          timestamp: Date.now().toString()
-        }
+      // Navigiere zum Alert-Screen
+      navigation.navigate('Alert', {
+        type: 'motion',
+        timestamp: Date.now()
       });
 
       // Automatische Kamera-Aktivierung erfolgt im Alert-Screen
@@ -259,16 +209,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={[
-      styles.container, 
-      { 
-        backgroundColor: theme.colors.background,
-        paddingTop: insets.top,
-        paddingBottom: insets.bottom,
-        paddingLeft: insets.left,
-        paddingRight: insets.right,
-      }
-    ]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Surface style={styles.headerCard}>
         <Text variant="headlineMedium" style={styles.title}>
           🛡️ PocketGuardian
@@ -307,21 +248,6 @@ export default function HomeScreen() {
               {backgroundStatus}
             </Text>
           </View>
-          <View style={styles.statusItem}>
-            <Text variant="bodyMedium">Pocket-Status:</Text>
-            <Text 
-              variant="bodyMedium" 
-              style={[styles.statusValue, { color: isPocketMode ? theme.colors.primary : theme.colors.outline }]}
-            >
-              {isPocketMode ? '📱 Im Pocket' : '🌞 Draußen'}
-            </Text>
-          </View>
-          <View style={styles.statusItem}>
-            <Text variant="bodyMedium">Sensitivität:</Text>
-            <Text variant="bodyMedium" style={styles.statusValue}>
-              🔽 Sehr niedrig (starkes Schütteln nötig)
-            </Text>
-          </View>
         </Card.Content>
       </Card>
 
@@ -332,20 +258,6 @@ export default function HomeScreen() {
             <Switch
               value={isMonitoring}
               onValueChange={toggleMonitoring}
-              disabled={!isInitialized}
-            />
-          </View>
-
-          <View style={styles.switchContainer}>
-            <View>
-              <Text variant="titleSmall">Auto-Mode (Pocket-Erkennung)</Text>
-              <Text variant="bodySmall" style={styles.infoText}>
-                Automatische Aktivierung im Pocket, Deaktivierung draußen
-              </Text>
-            </View>
-            <Switch
-              value={autoModeEnabled}
-              onValueChange={setAutoModeEnabled}
               disabled={!isInitialized}
             />
           </View>
@@ -368,15 +280,6 @@ export default function HomeScreen() {
           >
             System-Test
           </Button>
-          
-          <Button
-            mode="outlined"
-            onPress={() => router.push('/camera')}
-            style={styles.button}
-            icon="camera"
-          >
-            Kamera öffnen
-          </Button>
         </Card.Content>
       </Card>
 
@@ -386,9 +289,7 @@ export default function HomeScreen() {
             ℹ️ Information
           </Text>
           <Text variant="bodySmall" style={styles.infoText}>
-            Die Überwachung ist jetzt SEHR UNSENSIBEL - Sie müssen das Handy kräftig schütteln um einen Alarm auszulösen.
-            {'\n\n'}
-            Auto-Mode: Aktiviert automatisch die Überwachung wenn das Handy in die Tasche gesteckt wird.
+            Aktivieren Sie die Überwachung, um automatisch Fotos bei unerwarteten Bewegungen aufzunehmen.
             {'\n\n'}
             Konfigurieren Sie Notfallkontakte in den Einstellungen.
           </Text>
