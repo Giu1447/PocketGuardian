@@ -12,8 +12,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ErrorBoundary from '../src/components/ErrorBoundary';
 import {
-  notificationService,
-  sensorService
+    notificationService,
+    sensorService
 } from '../src/services';
 
 export default function RootLayout() {

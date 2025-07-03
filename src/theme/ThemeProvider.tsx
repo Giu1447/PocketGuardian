@@ -3,7 +3,7 @@
  */
 
 import React, { ReactNode } from 'react';
-import { PaperProvider, MD3LightTheme } from 'react-native-paper';
+import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 
 interface ThemeProviderProps {
   children: ReactNode;
