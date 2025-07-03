@@ -131,7 +131,7 @@ class BackgroundTaskService {
       return {
         available: status === BackgroundFetch.BackgroundFetchStatus.Available,
         registered: isRegistered,
-        status: status ? this.getStatusString(status) : 'Unbekannt'
+        status: this.getStatusString(status)
       };
     } catch (error) {
       console.error('❌ Fehler beim Abrufen des Background-Status:', error);

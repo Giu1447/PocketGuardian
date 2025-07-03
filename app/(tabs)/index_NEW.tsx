@@ -1,23 +1,23 @@
 /**
  * Home Screen - Hauptbildschirm der PocketGuardian App (Expo Router)
- * STABILISIERTE VERSION für bessere Performance und Responsivität
+ * RESPONSIVE VERSION mit verbesserter Stabilität
  */
 
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View, Dimensions } from 'react-native';
+import { Alert, Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Surface, Switch, Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  backgroundTaskService,
-  cameraService,
-  emergencyService,
-  notificationService,
-  sensorService
+    backgroundTaskService,
+    cameraService,
+    emergencyService,
+    notificationService,
+    sensorService
 } from '../../src/services';
 import { AppSettings, EmergencyContact } from '../../src/types';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -59,56 +59,29 @@ export default function HomeScreen() {
   const initializeServices = async () => {
     try {
       setIsLoading(true);
-      console.log('🚀 Initialisiere Services (stabilisiert)...');
+      console.log('🚀 Initialisiere Services (vereinfacht)...');
 
-      // Sequentielle Initialisierung für Stabilität
-      let sensorInit = false;
-      let cameraInit = false;
-      let notificationInit = false;
+      // Nur kritische Services initialisieren
+      await sensorService.initialize();
+      await notificationService.initialize();
+      
+      // Prüfe E-Mail-Verfügbarkeit
+      const emailAvailable = await emergencyService.isEmailAvailable();
+      console.log('📧 E-Mail verfügbar:', emailAvailable);
 
-      try {
-        sensorInit = await sensorService.initialize();
-        console.log('✅ Sensor-Service:', sensorInit ? 'OK' : 'FEHLER');
-      } catch (error) {
-        console.warn('⚠️ Sensor-Service Fehler:', error);
-      }
-
-      try {
-        cameraInit = await cameraService.initialize();
-        console.log('✅ Kamera-Service:', cameraInit ? 'OK' : 'FEHLER');
-      } catch (error) {
-        console.warn('⚠️ Kamera-Service Fehler:', error);
-      }
-
-      try {
-        notificationInit = await notificationService.initialize();
-        console.log('✅ Notification-Service:', notificationInit ? 'OK' : 'FEHLER');
-      } catch (error) {
-        console.warn('⚠️ Notification-Service Fehler:', error);
-      }
-
-      // Konfiguriere Sensor-Einstellungen (SEHR UNSENSIBEL)
-      try {
-        sensorService.updateSettings(settings.sensorSettings);
-        console.log('✅ Sensor-Einstellungen konfiguriert');
-      } catch (error) {
-        console.warn('⚠️ Sensor-Konfiguration Fehler:', error);
-      }
-
-      // Setze Pocket-State-Handler für automatische Aktivierung
-      try {
-        sensorService.setPocketStateHandler(handlePocketStateChange);
-        console.log('✅ Pocket-Handler gesetzt');
-      } catch (error) {
-        console.warn('⚠️ Pocket-Handler Fehler:', error);
-      }
+      // Setze Pocket-Handler
+      sensorService.setPocketStateHandler(handlePocketStateChange);
 
       setIsInitialized(true);
       console.log('✅ Services erfolgreich initialisiert');
 
     } catch (error) {
-      console.error('❌ Fehler beim Initialisieren der Services:', error);
-      Alert.alert('Fehler', 'Services konnten nicht vollständig initialisiert werden');
+      console.error('❌ Fehler bei Service-Initialisierung:', error);
+      Alert.alert(
+        'Initialisierungs-Fehler',
+        'Einige Funktionen sind möglicherweise nicht verfügbar.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setIsLoading(false);
     }
@@ -146,30 +119,22 @@ export default function HomeScreen() {
         console.log('🔄 Auto-Aktivierung: Handy im Pocket erkannt');
         await toggleMonitoring();
         
-        try {
-          await notificationService.showLocalNotification({
-            title: '🔄 Auto-Aktiviert',
-            body: 'PocketGuardian wurde automatisch aktiviert',
-            data: { type: 'auto_activated' }
-          });
-        } catch (error) {
-          console.warn('⚠️ Notification-Fehler:', error);
-        }
+        await notificationService.showLocalNotification({
+          title: '🔄 Auto-Aktiviert',
+          body: 'PocketGuardian wurde automatisch aktiviert',
+          data: { type: 'auto_activated' }
+        });
         
       } else if (!inPocket && isMonitoring && autoModeEnabled) {
         // Automatisch deaktivieren wenn draußen
         console.log('⏸️ Auto-Deaktivierung: Handy aus Pocket genommen');
         await toggleMonitoring();
         
-        try {
-          await notificationService.showLocalNotification({
-            title: '⏸️ Auto-Deaktiviert',
-            body: 'PocketGuardian wurde automatisch deaktiviert',
-            data: { type: 'auto_deactivated' }
-          });
-        } catch (error) {
-          console.warn('⚠️ Notification-Fehler:', error);
-        }
+        await notificationService.showLocalNotification({
+          title: '⏸️ Auto-Deaktiviert',
+          body: 'PocketGuardian wurde automatisch deaktiviert',
+          data: { type: 'auto_deactivated' }
+        });
       }
     } catch (error) {
       console.error('❌ Fehler bei Pocket-Handler:', error);
@@ -192,15 +157,11 @@ export default function HomeScreen() {
         setIsMonitoring(false);
         console.log('⏹️ Überwachung gestoppt');
         
-        try {
-          await notificationService.showLocalNotification({
-            title: '⏹️ Überwachung gestoppt',
-            body: 'PocketGuardian-Überwachung wurde deaktiviert',
-            data: { type: 'monitoring_stopped' }
-          });
-        } catch (error) {
-          console.warn('⚠️ Notification-Fehler:', error);
-        }
+        await notificationService.showLocalNotification({
+          title: '⏹️ Überwachung gestoppt',
+          body: 'PocketGuardian-Überwachung wurde deaktiviert',
+          data: { type: 'monitoring_stopped' }
+        });
         
       } else {
         // Starte Überwachung
@@ -215,15 +176,11 @@ export default function HomeScreen() {
         setIsMonitoring(true);
         console.log('✅ Überwachung gestartet');
         
-        try {
-          await notificationService.showLocalNotification({
-            title: '✅ Überwachung gestartet',
-            body: 'PocketGuardian überwacht jetzt Bewegungen',
-            data: { type: 'monitoring_started' }
-          });
-        } catch (error) {
-          console.warn('⚠️ Notification-Fehler:', error);
-        }
+        await notificationService.showLocalNotification({
+          title: '✅ Überwachung gestartet',
+          body: 'PocketGuardian überwacht jetzt Bewegungen',
+          data: { type: 'monitoring_started' }
+        });
       }
     } catch (error) {
       console.error('❌ Fehler beim Umschalten der Überwachung:', error);
@@ -249,11 +206,7 @@ export default function HomeScreen() {
       
       // Kamera-Aufnahme im Hintergrund
       setTimeout(async () => {
-        try {
-          await cameraService.captureDualPhoto();
-        } catch (error) {
-          console.error('❌ Kamera-Fehler:', error);
-        }
+        await cameraService.takeDualPhotos();
       }, 500);
       
     } catch (error) {
