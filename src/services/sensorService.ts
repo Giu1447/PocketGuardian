@@ -12,17 +12,17 @@ class SensorService {
   private isActive = false;
   private isLightSensorActive = false;
   private settings: SensorSettings = {
-    threshold: 20.0, // Reduziert auf mittleren Wert für bessere Erkennung
+    threshold: 40.0, // Erhöht auf 40.0 für deutlich weniger Sensibilität
     isEnabled: true, // Aktiviere den Sensor standardmäßig
-    sensitivity: 'medium' // Mittlere Sensitivität für bessere Balance
+    sensitivity: 'low' // Auf niedrige Sensitivität gesetzt
   };
   private onMotionDetected: (() => void) | null = null;
   private onPocketStateChanged: ((inPocket: boolean) => void) | null = null;
   private onSensorDataUpdate: ((data: any) => void) | null = null;
   private lastMotionTime = 0;
-  private motionCooldown = 5000; // Kürzerer Cooldown (5 Sekunden) für bessere Reaktionszeit
+  private motionCooldown = 10000; // Längerer Cooldown (10 Sekunden)
   private motionBuffer: number[] = []; // Buffer für Bewegungsdaten
-  private bufferSize = 8; // Weniger Messungen für schnellere Reaktion
+  private bufferSize = 15; // Mehr Messungen für stabilere Erkennung
   private baselineAcceleration = 9.81; // Schwerkraft-Basislinie
   
   // Lichtsensor-Properties
@@ -65,8 +65,8 @@ class SensorService {
     this.isActive = true;
     this.motionBuffer = []; // Buffer zurücksetzen
 
-    // Setze die Update-Frequenz (alle 500ms für bessere Reaktionszeit)
-    Accelerometer.setUpdateInterval(500);
+    // Setze die Update-Frequenz (alle 1000ms für niedrigere Sensitivität)
+    Accelerometer.setUpdateInterval(1000);
 
     this.accelerometerSubscription = Accelerometer.addListener((accelerometerData) => {
       this.handleAccelerometerData(accelerometerData);
@@ -113,15 +113,41 @@ class SensorService {
     // NEUE LOGIK: Wenn seit 10s keine STARKE Bewegung erkannt wurde, ist es im Pocket
     this.inPocket = timeSinceLastMotion > 10000 && this.motionBuffer.length > 0;
     
-    // Simuliere Lichtwert basierend auf Pocket-Status
-    this.currentLightLevel = this.inPocket ? 2 : 50;
+    // Berechne einen dynamischeren Lichtwert basierend auf Pocket-Status und letzter Bewegung
+    // Bei längerer Zeit ohne Bewegung sinkt der Lichtwert (simuliert das Einstecken in die Tasche)
+    const maxLightLevel = 100; // Maximales Licht (draußen)
+    const minLightLevel = 1;  // Minimales Licht (in der Tasche)
+    
+    if (this.inPocket) {
+      // Im Pocket: Lichtwert niedrig (1-5) mit leichten zufälligen Schwankungen
+      this.currentLightLevel = minLightLevel + (Math.random() * 4); 
+    } else {
+      // Nicht im Pocket: Höherer Lichtwert, der mit der Zeit seit der letzten Bewegung variiert
+      // Je länger ohne Bewegung, desto dunkler (simuliert langsames Einstecken)
+      const timeFactor = Math.min(timeSinceLastMotion / 10000, 1); // 0 bis 1
+      const baseLightLevel = maxLightLevel - (timeFactor * 30); // Zwischen 100 und 70
+      
+      // Füge zufällige Schwankungen hinzu, um realistische Änderungen zu simulieren
+      const randomVariation = (Math.random() * 20) - 10; // -10 bis +10
+      this.currentLightLevel = Math.max(minLightLevel, Math.min(maxLightLevel, baseLightLevel + randomVariation));
+    }
     
     if (wasInPocket !== this.inPocket) {
       console.log(`💡 Pocket-Status (simuliert): ${this.inPocket ? 'IN POCKET' : 'DRAUSSEN'}`);
+      console.log(`  - Lichtstärke: ${this.currentLightLevel.toFixed(2)} lux`);
       
       if (this.onPocketStateChanged) {
         this.onPocketStateChanged(this.inPocket);
       }
+    }
+    
+    // Sende Updates auch wenn der Status gleich bleibt
+    if (this.onSensorDataUpdate) {
+      this.onSensorDataUpdate({
+        inPocket: this.inPocket,
+        lightLevel: this.currentLightLevel.toFixed(2),
+        timeSinceLastMotion: timeSinceLastMotion / 1000 // Numerischer Wert in Sekunden
+      });
     }
   }
 
@@ -160,6 +186,8 @@ class SensorService {
         inPocket: this.inPocket,
         lastMotionTime: this.lastMotionTime,
         timeSinceLastMotion: (Date.now() - this.lastMotionTime) / 1000,
+        lightLevel: this.currentLightLevel.toFixed(2), // Lichtsensor-Daten hinzufügen
+        lightState: this.inPocket ? 'dunkel (im Pocket)' : 'hell (sichtbar)'
       });
     }
     
@@ -190,16 +218,16 @@ class SensorService {
     const variance = this.motionBuffer.reduce((sum, val) => sum + Math.pow(val - average, 2), 0) / this.motionBuffer.length;
     const standardDeviation = Math.sqrt(variance);
 
-    // ANGEPASSTE Schwellenwerte für bessere Balance
+    // ANGEPASSTE Schwellenwerte für deutlich geringere Sensibilität
     const sensitivityMultiplier = this.getSensitivityMultiplier();
-    const threshold = 3.0 * sensitivityMultiplier; // Reduziert für bessere Erkennung
+    const threshold = 8.0 * sensitivityMultiplier; // Erhöht für weniger Sensibilität
     
     // Vereinfachte Erkennungskriterien:
     // 1. Deutliche Abweichung von der Schwerkraft (Sturz/Aufprall)
     const gravitationalDeviation = Math.abs(average - this.baselineAcceleration);
     
     // 2. Hohe Standardabweichung (starkes Schütteln)
-    const isJerkyMotion = standardDeviation > 1.5; // Reduziert für bessere Erkennung
+    const isJerkyMotion = standardDeviation > 3.0; // Erhöht für weniger Empfindlichkeit
     
     // 3. Hohe Beschleunigungsänderung
     const isSharpDeviation = gravitationalDeviation > threshold;
@@ -207,8 +235,8 @@ class SensorService {
     // DEBUG-Ausgabe für jede Messung
     // console.log(`Sensor-Check: Accel=${totalAcceleration.toFixed(2)}, Avg=${average.toFixed(2)}, StdDev=${standardDeviation.toFixed(2)}, Dev=${gravitationalDeviation.toFixed(2)}`);
 
-    // Vereinfachte Motion Detection - ODER-Operator statt UND für bessere Erkennung
-    if (isSharpDeviation || isJerkyMotion) {
+    // Vereinfachte Motion Detection - UND-Operator für weniger Fehlalarme
+    if (isSharpDeviation && isJerkyMotion) {
       console.log('🚨 BEWEGUNG erkannt! (Sturz oder starkes Schütteln)');
       console.log('📊 Details:', {
         totalAcceleration: totalAcceleration.toFixed(2),
@@ -234,7 +262,7 @@ class SensorService {
       case 'medium':
         return 1.0; // Standard
       case 'low':
-        return 1.5; // Weniger sensibel
+        return 2.5; // Deutlich weniger sensibel
       default:
         return 1.2;
     }

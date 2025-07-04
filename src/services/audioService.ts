@@ -62,14 +62,34 @@ class AudioService {
   public async stopSound(): Promise<void> {
     try {
       if (this.sound) {
-        await this.sound.stopAsync();
-        await this.sound.unloadAsync();
+        try {
+          // Versuche zuerst die Wiedergabe zu pausieren (weniger fehleranfällig)
+          await this.sound.pauseAsync();
+          console.log('⏸️ Sound pausiert');
+        } catch (pauseError) {
+          console.warn('⚠️ Fehler beim Pausieren des Sounds:', pauseError);
+          // Fortfahren trotz Fehler
+        }
+        
+        try {
+          // Dann versuche den Sound zu entladen
+          await this.sound.unloadAsync();
+          console.log('🗑️ Sound entladen');
+        } catch (unloadError) {
+          console.warn('⚠️ Fehler beim Entladen des Sounds:', unloadError);
+          // Fortfahren trotz Fehler
+        }
+        
+        // Setze in jedem Fall die Referenzen zurück
         this.sound = null;
         this.isPlaying = false;
-        console.log('⏹️ Sound gestoppt');
+        console.log('⏹️ Sound-Ressourcen freigegeben');
       }
     } catch (error) {
       console.error('❌ Fehler beim Stoppen des Sounds:', error);
+      // Sicherheitshalber Referenzen zurücksetzen
+      this.sound = null;
+      this.isPlaying = false;
     }
   }
 

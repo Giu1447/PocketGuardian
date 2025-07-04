@@ -50,6 +50,14 @@ export default function HomeScreen() {
 
   useEffect(() => {
     initializeServices();
+    
+    // Reinigung beim Unmount
+    return () => {
+      // Stoppe den Alarm-Sound, wenn die Komponente unmounted wird
+      audioService.stopSound().catch(error => {
+        console.error('❌ Fehler beim Stoppen des Alarm-Sounds beim Unmount:', error);
+      });
+    };
   }, []);
 
   useEffect(() => {
@@ -75,6 +83,11 @@ export default function HomeScreen() {
       if (isMonitoring) {
         toggleMonitoring();
       }
+      
+      // Stoppe den Alarm-Sound, wenn die App in den Hintergrund geht
+      audioService.stopSound().catch(error => {
+        console.error('❌ Fehler beim Stoppen des Alarm-Sounds bei App-Deaktivierung:', error);
+      });
     }
   }, [isMonitoring]);
 
@@ -204,6 +217,14 @@ export default function HomeScreen() {
         setSensorData(null); // Debug-Daten zurücksetzen
         console.log('⏹️ Überwachung gestoppt');
         
+        // Stoppe auch den Alarm-Sound
+        try {
+          await audioService.stopSound();
+          console.log('🔇 Alarm-Sound gestoppt beim Deaktivieren der Überwachung');
+        } catch (soundError) {
+          console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', soundError);
+        }
+        
         try {
           await notificationService.showLocalNotification({
             title: '⏹️ Überwachung gestoppt',
@@ -218,7 +239,7 @@ export default function HomeScreen() {
         // Aktiviere Sensor-Einstellungen und starte Überwachung
         sensorService.updateSettings({
           isEnabled: true,
-          sensitivity: 'medium'
+          sensitivity: 'low' // Auf niedrige Sensitivität setzen
         });
         
         // Starte Überwachung mit Debug-Callback
@@ -278,14 +299,8 @@ export default function HomeScreen() {
         }
       });
       
-      // Kamera-Aufnahme im Hintergrund
-      setTimeout(async () => {
-        try {
-          await cameraService.captureEmergencyVideo();
-        } catch (error) {
-          console.error('❌ Kamera-Fehler:', error);
-        }
-      }, 500);
+      // Entferne den Versuch, im Hintergrund ein Video aufzunehmen
+      // Die Kamera wird jetzt nur im Alert-Screen verwendet
       
     } catch (error) {
       console.error('❌ Fehler im Notfall-Handler:', error);
@@ -490,9 +505,27 @@ export default function HomeScreen() {
         <Card style={styles.card}>
           <Card.Title title="Live Sensor-Daten (Debug)" subtitle="Wird nur bei aktiver Überwachung angezeigt" />
           <Card.Content>
-            <Text>Beschleunigung: {sensorData.totalAcceleration}</Text>
-            <Text>Im Pocket (simuliert): {sensorData.inPocket ? 'Ja' : 'Nein'}</Text>
-            <Text>Zeit seit Bewegung: {sensorData.timeSinceLastMotion?.toFixed(1)}s</Text>
+            <View style={styles.sensorDataContainer}>
+              {/* Bewegungssensor-Daten */}
+              <View style={styles.sensorDataColumn}>
+                <Text style={styles.sensorDataTitle}>Bewegungssensor:</Text>
+                <Text>Beschleunigung: {sensorData.totalAcceleration || 'N/A'}</Text>
+                <Text>Zeit seit Bewegung: {
+                  typeof sensorData.timeSinceLastMotion === 'number' 
+                    ? sensorData.timeSinceLastMotion.toFixed(1) 
+                    : typeof sensorData.timeSinceLastMotion === 'string'
+                      ? sensorData.timeSinceLastMotion.replace('s', '')
+                      : 'N/A'
+                }s</Text>
+              </View>
+              
+              {/* Lichtsensor-Daten */}
+              <View style={styles.sensorDataColumn}>
+                <Text style={styles.sensorDataTitle}>Lichtsensor (simuliert):</Text>
+                <Text>Lichtstärke: {sensorData.lightLevel || '?'} lux</Text>
+                <Text>Status: {sensorData.inPocket ? 'Im Pocket' : 'Sichtbar'}</Text>
+              </View>
+            </View>
           </Card.Content>
         </Card>
       )}
@@ -614,6 +647,24 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginVertical: 6,
+  },
+  // Neue Styles für Sensor-Daten-Anzeige
+  sensorDataContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 8,
+  },
+  sensorDataColumn: {
+    flex: 1,
+    padding: 8,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderRadius: 6,
+    marginHorizontal: 4,
+  },
+  sensorDataTitle: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+    fontSize: 14,
   },
   safetyCard: {
     marginBottom: 16,
