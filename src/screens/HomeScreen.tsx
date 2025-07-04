@@ -46,7 +46,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   useEffect(() => {
     initializeServices();
     checkBackgroundStatus();
-  }, []);
+  });
 
   /**
    * Initialisiert alle Services

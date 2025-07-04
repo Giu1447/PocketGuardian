@@ -206,7 +206,7 @@ class EmergencyService {
   public async executeEmergencyProcedure(
     image: CapturedImage,
     contacts: EmergencyContact[]
-  ): Promise<{ success: boolean; results: Array<{ contact: string; success: boolean }> }> {
+  ): Promise<{ success: boolean; results: { contact: string; success: boolean }[] }> {
     console.log('🚨 Starte Notfall-Prozedur...');
 
     if (contacts.length === 0) {
@@ -214,7 +214,7 @@ class EmergencyService {
       return { success: false, results: [] };
     }
 
-    const results: Array<{ contact: string; success: boolean }> = [];
+    const results: { contact: string; success: boolean }[] = [];
     
     for (const contact of contacts) {
       console.log(`Verarbeite Kontakt: ${contact.name}`);
@@ -261,7 +261,7 @@ class EmergencyService {
   public async executeEmergencyProcedureWithVideo(
     emergencyData: EmergencyData,
     contacts: EmergencyContact[]
-  ): Promise<{ success: boolean; results: Array<{ contact: string; success: boolean }> }> {
+  ): Promise<{ success: boolean; results: { contact: string; success: boolean }[] }> {
     console.log('🚨 Starte Video-Notfall-Prozedur...');
 
     if (!contacts || contacts.length === 0) {
@@ -274,7 +274,7 @@ class EmergencyService {
       return { success: false, results: [] };
     }
 
-    const results: Array<{ contact: string; success: boolean }> = [];
+    const results: { contact: string; success: boolean }[] = [];
     
     // Verwende Promise.allSettled für bessere Fehlerresistenz
     const contactPromises = contacts.map(async (contact) => {

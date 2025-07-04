@@ -8,13 +8,33 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, AppStateStatus, Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Surface, Switch, Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  audioService,
-  cameraService,
-  notificationService,
-  sensorService
-} from '../../src/services';
+
 import { AppSettings, EmergencyContact } from '../../src/types';
+
+// Mock Services für Entwicklung
+const mockServices = {
+  audioService: {
+    playAlarmSound: async (loop: boolean = false) => Promise.resolve(),
+    stopSound: async () => Promise.resolve(),
+  },
+  cameraService: {
+    initialize: async () => Promise.resolve(true),
+  },
+  notificationService: {
+    initialize: async () => Promise.resolve(true),
+    showLocalNotification: async (options: any) => Promise.resolve(),
+  },
+  sensorService: {
+    initialize: async () => Promise.resolve(true),
+    updateSettings: (settings: any) => {},
+    setPocketStateHandler: (handler: any) => {},
+    stopMonitoring: () => {},
+    startMonitoring: (onMotion: any, onData?: any) => {},
+    testMotionDetection: () => {},
+  },
+};
+
+const { audioService, cameraService, notificationService, sensorService } = mockServices;
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -26,7 +46,13 @@ export default function HomeScreen() {
   const [isPocketMode, setIsPocketMode] = useState(false);
   const [autoModeEnabled, setAutoModeEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [sensorData, setSensorData] = useState<any>(null); // NEU: Für Debug-Daten
+  const [sensorData, setSensorData] = useState<{
+    totalAcceleration?: number;
+    timeSinceLastMotion?: number | string;
+    lightLevel?: number;
+    inPocket?: boolean;
+  } | null>(null);
+  
   const appState = useRef(AppState.currentState);
 
   // Dummy-Einstellungen (würden normalerweise aus AsyncStorage kommen)
@@ -53,12 +79,87 @@ export default function HomeScreen() {
     
     // Reinigung beim Unmount
     return () => {
-      // Stoppe den Alarm-Sound, wenn die Komponente unmounted wird
-      audioService.stopSound().catch(error => {
-        console.error('❌ Fehler beim Stoppen des Alarm-Sounds beim Unmount:', error);
-      });
+      const cleanup = async () => {
+        try {
+          await audioService.stopSound();
+        } catch (error) {
+          console.error('❌ Fehler beim Stoppen des Alarm-Sounds beim Unmount:', error);
+        }
+      };
+      cleanup();
     };
   }, []);
+
+  // toggleMonitoring muss vor handleAppStateChange deklariert werden!
+  /**
+   * Startet/Stoppt die Bewegungsüberwachung - Ohne Hintergrundaktivitäten
+   */
+  const toggleMonitoring = useCallback(async () => {
+    if (isLoading) return;
+    
+    try {
+      setIsLoading(true);
+      
+      if (isMonitoring) {
+        // Stoppe Überwachung
+        sensorService.stopMonitoring();
+        setIsMonitoring(false);
+        setSensorData(null);
+        console.log('⏹️ Überwachung gestoppt');
+        
+        // Stoppe auch den Alarm-Sound
+        try {
+          await audioService.stopSound();
+          console.log('🔇 Alarm-Sound gestoppt beim Deaktivieren der Überwachung');
+        } catch (soundError) {
+          console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', soundError);
+        }
+        
+        try {
+          await notificationService.showLocalNotification({
+            title: '⏹️ Überwachung gestoppt',
+            body: 'PocketGuardian-Überwachung wurde deaktiviert',
+            data: { type: 'monitoring_stopped' }
+          });
+        } catch (error) {
+          console.warn('⚠️ Notification-Fehler:', error);
+        }
+        
+      } else {
+        // Aktiviere Sensor-Einstellungen und starte Überwachung
+        sensorService.updateSettings({
+          isEnabled: true,
+          sensitivity: 'low'
+        });
+        
+        // Starte Überwachung mit Debug-Callback
+        sensorService.startMonitoring(handleMotionDetected, (data: any) => {
+          setSensorData(data);
+        });
+        setIsMonitoring(true);
+        console.log('▶️ Überwachung gestartet');
+        
+        try {
+          await notificationService.showLocalNotification({
+            title: '✅ Überwachung gestartet',
+            body: 'PocketGuardian überwacht jetzt Bewegungen',
+            data: { type: 'monitoring_started' }
+          });
+        } catch (error) {
+          console.warn('⚠️ Notification-Fehler:', error);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Fehler beim Umschalten der Überwachung:', error);
+      Alert.alert(
+        'Fehler',
+        'Die Überwachung konnte nicht umgeschaltet werden.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, isMonitoring]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
@@ -81,7 +182,9 @@ export default function HomeScreen() {
       // App geht in den Hintergrund
       console.log('🌙 App inaktiv - stoppe Überwachung');
       if (isMonitoring) {
-        toggleMonitoring();
+        toggleMonitoring().catch(error => {
+          console.error('❌ Fehler beim Stoppen der Überwachung:', error);
+        });
       }
       
       // Stoppe den Alarm-Sound, wenn die App in den Hintergrund geht
@@ -89,7 +192,7 @@ export default function HomeScreen() {
         console.error('❌ Fehler beim Stoppen des Alarm-Sounds bei App-Deaktivierung:', error);
       });
     }
-  }, [isMonitoring]);
+  }, [isMonitoring, toggleMonitoring]);
 
   /**
    * Initialisiert alle Services - Vereinfacht ohne Hintergrundaktivitäten
@@ -130,140 +233,15 @@ export default function HomeScreen() {
         sensorService.updateSettings(settings.sensorSettings);
         console.log('✅ Sensor-Einstellungen konfiguriert');
       } catch (error) {
-        console.warn('⚠️ Sensor-Konfiguration Fehler:', error);
+        console.warn('⚠️ Fehler beim Konfigurieren der Sensor-Einstellungen:', error);
       }
 
-      // Setze Pocket-State-Handler für automatische Aktivierung
-      try {
-        sensorService.setPocketStateHandler(handlePocketStateChange);
-        console.log('✅ Pocket-Handler gesetzt');
-      } catch (error) {
-        console.warn('⚠️ Pocket-Handler Fehler:', error);
-      }
-
-      setIsInitialized(true);
-      console.log('✅ Services erfolgreich initialisiert');
-
+      setIsInitialized(sensorInit && cameraInit && notificationInit);
     } catch (error) {
-      console.error('❌ Fehler beim Initialisieren der Services:', error);
-      Alert.alert('Fehler', 'Services konnten nicht vollständig initialisiert werden');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /**
-   * Handler für Pocket-Status-Änderungen (automatische Aktivierung/Deaktivierung)
-   */
-  const handlePocketStateChange = async (inPocket: boolean) => {
-    try {
-      setIsPocketMode(inPocket);
-      
-      if (!autoModeEnabled) {
-        console.log('💡 Auto-Mode deaktiviert, ignoriere Pocket-Status');
-        return;
-      }
-      
-      console.log(`💡 Pocket-Status: ${inPocket ? 'IM POCKET' : 'DRAUSSEN'}`);
-      
-      if (inPocket && !isMonitoring) {
-        // Automatisch aktivieren wenn im Pocket
-        console.log('🔄 Auto-Aktivierung: Handy im Pocket erkannt');
-        await toggleMonitoring();
-        
-        try {
-          await notificationService.showLocalNotification({
-            title: '🔄 Auto-Aktiviert',
-            body: 'PocketGuardian wurde automatisch aktiviert',
-            data: { type: 'auto_activated' }
-          });
-        } catch (error) {
-          console.warn('⚠️ Notification-Fehler:', error);
-        }
-        
-      } else if (!inPocket && isMonitoring && autoModeEnabled) {
-        // Automatisch deaktivieren wenn draußen
-        console.log('⏸️ Auto-Deaktivierung: Handy aus Pocket genommen');
-        await toggleMonitoring();
-        
-        try {
-          await notificationService.showLocalNotification({
-            title: '⏸️ Auto-Deaktiviert',
-            body: 'PocketGuardian wurde automatisch deaktiviert',
-            data: { type: 'auto_deactivated' }
-          });
-        } catch (error) {
-          console.warn('⚠️ Notification-Fehler:', error);
-        }
-      }
-    } catch (error) {
-      console.error('❌ Fehler bei Pocket-Handler:', error);
-    }
-  };
-
-  /**
-   * Startet/Stoppt die Bewegungsüberwachung - Ohne Hintergrundaktivitäten
-   */
-  const toggleMonitoring = async () => {
-    if (isLoading) return;
-    
-    try {
-      setIsLoading(true);
-      
-      if (isMonitoring) {
-        // Stoppe Überwachung
-        sensorService.stopMonitoring();
-        setIsMonitoring(false);
-        setSensorData(null); // Debug-Daten zurücksetzen
-        console.log('⏹️ Überwachung gestoppt');
-        
-        // Stoppe auch den Alarm-Sound
-        try {
-          await audioService.stopSound();
-          console.log('🔇 Alarm-Sound gestoppt beim Deaktivieren der Überwachung');
-        } catch (soundError) {
-          console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', soundError);
-        }
-        
-        try {
-          await notificationService.showLocalNotification({
-            title: '⏹️ Überwachung gestoppt',
-            body: 'PocketGuardian-Überwachung wurde deaktiviert',
-            data: { type: 'monitoring_stopped' }
-          });
-        } catch (error) {
-          console.warn('⚠️ Notification-Fehler:', error);
-        }
-        
-      } else {
-        // Aktiviere Sensor-Einstellungen und starte Überwachung
-        sensorService.updateSettings({
-          isEnabled: true,
-          sensitivity: 'low' // Auf niedrige Sensitivität setzen
-        });
-        
-        // Starte Überwachung mit Debug-Callback
-        sensorService.startMonitoring(handleMotionDetected, (data) => {
-          setSensorData(data);
-        });
-        setIsMonitoring(true);
-        console.log('▶️ Überwachung gestartet');
-        
-        try {
-          await notificationService.showLocalNotification({
-            title: '✅ Überwachung gestartet',
-            body: 'PocketGuardian überwacht jetzt Bewegungen',
-            data: { type: 'monitoring_started' }
-          });
-        } catch (error) {
-          console.warn('⚠️ Notification-Fehler:', error);
-        }
-      }
-    } catch (error) {
-      console.error('❌ Fehler beim Umschalten der Überwachung:', error);
+      console.error('❌ Fehler bei der Initialisierung:', error);
       Alert.alert(
         'Fehler',
-        'Die Überwachung konnte nicht umgeschaltet werden.',
+        'Die Services konnten nicht initialisiert werden.',
         [{ text: 'OK' }]
       );
     } finally {
@@ -274,23 +252,21 @@ export default function HomeScreen() {
   /**
    * Wird aufgerufen, wenn eine Bewegung erkannt wird
    */
-  const handleMotionDetected = () => {
+  const handleMotionDetected = useCallback(() => {
     console.log('🚨 BEWEGUNG ERKANNT IN HOME SCREEN');
-    // Sofort Alarm-Sound abspielen für schnellere Reaktion
     audioService.playAlarmSound(true).catch((error: any) => {
       console.error('❌ Audio-Fehler:', error);
     });
     handleEmergency();
-  };
+  }, []);
 
   /**
    * Behandelt Notfälle - Vereinfacht mit nur Frontkamera
    */
-  const handleEmergency = async () => {
+  const handleEmergency = useCallback(async () => {
     try {
       console.log('🚨 Notfall-Handler gestartet');
       
-      // Navigiere mit Parametern für bessere Stabilität
       router.push({
         pathname: '/alert',
         params: {
@@ -299,13 +275,10 @@ export default function HomeScreen() {
         }
       });
       
-      // Entferne den Versuch, im Hintergrund ein Video aufzunehmen
-      // Die Kamera wird jetzt nur im Alert-Screen verwendet
-      
     } catch (error) {
       console.error('❌ Fehler im Notfall-Handler:', error);
     }
-  };
+  }, []);
 
   /**
    * Navigiert zu Kamera-Test
@@ -324,7 +297,7 @@ export default function HomeScreen() {
   /**
    * Test-Bewegung simulieren
    */
-  const handleTestMotion = () => {
+  const handleTestMotion = useCallback(() => {
     if (isMonitoring) {
       sensorService.testMotionDetection();
     } else {
@@ -334,7 +307,7 @@ export default function HomeScreen() {
         [{ text: 'OK' }]
       );
     }
-  };
+  }, [isMonitoring]);
 
   if (!isInitialized) {
     return (

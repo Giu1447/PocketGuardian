@@ -2,12 +2,6 @@
  * Gemeinsame Typdefinitionen für die PocketGuardian App
  */
 
-export interface SensorSettings {
-  threshold: number;
-  isEnabled: boolean;
-  sensitivity: 'low' | 'medium' | 'high';
-}
-
 export interface EmergencyContact {
   id: string;
   name: string;
@@ -15,11 +9,24 @@ export interface EmergencyContact {
   email?: string;
 }
 
+export interface SensorSettings {
+  threshold: number;
+  isEnabled: boolean;
+  sensitivity: 'low' | 'medium' | 'high';
+}
+
 export interface AppSettings {
   darkMode: boolean;
   emergencyContacts: EmergencyContact[];
   sensorSettings: SensorSettings;
   autoCapture: boolean;
+}
+
+export interface SensorData {
+  totalAcceleration?: number;
+  timeSinceLastMotion?: number | string;
+  lightLevel?: number;
+  inPocket?: boolean;
 }
 
 export interface AccelerometerData {

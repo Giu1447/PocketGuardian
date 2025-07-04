@@ -5,7 +5,6 @@
 import { Camera } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { CapturedVideo, EmergencyData } from '../types';
-import { formatDateForFilename } from '../utils/helpers';
 
 class CameraService {
   private frontCameraRef: any | null = null;
@@ -187,7 +186,6 @@ class CameraService {
 
       // Speichere das Video in der Medienbibliothek
       const asset = await MediaLibrary.createAssetAsync(video.uri);
-      const filename = `PocketGuardian_${formatDateForFilename(Date.now())}_emergency.mp4`;
       await MediaLibrary.createAlbumAsync('PocketGuardian', asset, false);
       
       console.log(`  -> Video in Album gespeichert.`);
