@@ -39,9 +39,14 @@ export interface CapturedImage {
   camera?: 'front' | 'back';
 }
 
-export interface DualCapturedImages {
-  frontImage?: CapturedImage;
-  backImage?: CapturedImage;
+export interface CapturedVideo {
+  uri: string;
+  timestamp: number;
+  duration: number; // Dauer in Millisekunden
+}
+
+export interface EmergencyData {
+  frontVideo?: CapturedVideo;
   timestamp: number;
   location?: {
     latitude: number;

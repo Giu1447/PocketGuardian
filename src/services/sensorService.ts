@@ -12,16 +12,17 @@ class SensorService {
   private isActive = false;
   private isLightSensorActive = false;
   private settings: SensorSettings = {
-    threshold: 25.0, // DRASTISCH erhöht von 2.5 auf 25.0 (10x unsensibler)
-    isEnabled: false,
-    sensitivity: 'low' // Standard auf 'low' gesetzt
+    threshold: 20.0, // Reduziert auf mittleren Wert für bessere Erkennung
+    isEnabled: true, // Aktiviere den Sensor standardmäßig
+    sensitivity: 'medium' // Mittlere Sensitivität für bessere Balance
   };
   private onMotionDetected: (() => void) | null = null;
   private onPocketStateChanged: ((inPocket: boolean) => void) | null = null;
+  private onSensorDataUpdate: ((data: any) => void) | null = null;
   private lastMotionTime = 0;
-  private motionCooldown = 10000; // 10 Sekunden Cooldown (erhöht)
+  private motionCooldown = 5000; // Kürzerer Cooldown (5 Sekunden) für bessere Reaktionszeit
   private motionBuffer: number[] = []; // Buffer für Bewegungsdaten
-  private bufferSize = 8; // Mehr Messungen für zuverlässigere Erkennung
+  private bufferSize = 8; // Weniger Messungen für schnellere Reaktion
   private baselineAcceleration = 9.81; // Schwerkraft-Basislinie
   
   // Lichtsensor-Properties
@@ -54,28 +55,29 @@ class SensorService {
   /**
    * Startet die Bewegungserkennung mit drastisch reduzierter Sensitivität
    */
-  public startMonitoring(onMotionDetected: () => void): void {
+  public startMonitoring(onMotionDetected: () => void, onSensorDataUpdate?: (data: any) => void): void {
     if (this.isActive) {
       this.stopMonitoring();
     }
 
     this.onMotionDetected = onMotionDetected;
+    this.onSensorDataUpdate = onSensorDataUpdate || null; // NEU: Callback für Debug-Daten
     this.isActive = true;
     this.motionBuffer = []; // Buffer zurücksetzen
 
-    // Setze die Update-Frequenz (alle 500ms für weniger Sensitivität)
+    // Setze die Update-Frequenz (alle 500ms für bessere Reaktionszeit)
     Accelerometer.setUpdateInterval(500);
 
     this.accelerometerSubscription = Accelerometer.addListener((accelerometerData) => {
       this.handleAccelerometerData(accelerometerData);
     });
 
-    console.log('🔄 Bewegungsüberwachung gestartet (UNSENSIBEL)');
+    console.log('🔄 Bewegungsüberwachung gestartet (UNSENSIBLER EINGESTELLT)');
     console.log('⚙️ Einstellungen:', {
       threshold: this.settings.threshold,
       sensitivity: this.settings.sensitivity,
       cooldown: this.motionCooldown + 'ms',
-      note: 'Sehr hoher Schwellenwert - nur bei starkem Schütteln'
+      note: 'Schwellenwert erhöht für reduzierte Sensibilität'
     });
 
     // Starte auch Pocket-Erkennung (vereinfacht ohne echten Lichtsensor)
@@ -108,8 +110,8 @@ class SensorService {
     const timeSinceLastMotion = Date.now() - this.lastMotionTime;
     const wasInPocket = this.inPocket;
     
-    // Sehr einfache Heuristik: Mehr als 30 Sekunden keine starke Bewegung = im Pocket
-    this.inPocket = timeSinceLastMotion > 30000 && this.motionBuffer.length > 0;
+    // NEUE LOGIK: Wenn seit 10s keine STARKE Bewegung erkannt wurde, ist es im Pocket
+    this.inPocket = timeSinceLastMotion > 10000 && this.motionBuffer.length > 0;
     
     // Simuliere Lichtwert basierend auf Pocket-Status
     this.currentLightLevel = this.inPocket ? 2 : 50;
@@ -144,21 +146,36 @@ class SensorService {
    * Erkennt nur noch starkes, absichtliches Schütteln
    */
   private handleAccelerometerData(data: AccelerometerData): void {
-    if (!this.settings.isEnabled || !this.onMotionDetected) {
+    if (!this.onMotionDetected) { // Prüfung vereinfacht
       return;
     }
 
     // Berechne die Gesamtbeschleunigung
     const totalAcceleration = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
     
+    // DEBUG: Live-Daten an UI senden
+    if (this.onSensorDataUpdate) {
+      this.onSensorDataUpdate({
+        totalAcceleration: totalAcceleration.toFixed(2),
+        inPocket: this.inPocket,
+        lastMotionTime: this.lastMotionTime,
+        timeSinceLastMotion: (Date.now() - this.lastMotionTime) / 1000,
+      });
+    }
+    
+    // Nur weiter, wenn der Service aktiviert ist
+    if (!this.settings.isEnabled) {
+        return;
+    }
+
     // Füge zur Buffer hinzu
     this.motionBuffer.push(totalAcceleration);
     if (this.motionBuffer.length > this.bufferSize) {
       this.motionBuffer.shift();
     }
 
-    // Brauche mindestens 5 Messungen für sehr zuverlässige Erkennung
-    if (this.motionBuffer.length < 5) {
+    // Brauche mindestens 7 Messungen für zuverlässigere Erkennung
+    if (this.motionBuffer.length < 7) {
       return;
     }
 
@@ -173,82 +190,76 @@ class SensorService {
     const variance = this.motionBuffer.reduce((sum, val) => sum + Math.pow(val - average, 2), 0) / this.motionBuffer.length;
     const standardDeviation = Math.sqrt(variance);
 
-    // DRASTISCH erhöhte Schwellenwerte - nur bei wirklich starkem Schütteln
+    // ANGEPASSTE Schwellenwerte für bessere Balance
     const sensitivityMultiplier = this.getSensitivityMultiplier();
-    const threshold = this.settings.threshold * sensitivityMultiplier; // Schon 25.0, wird nochmal multipliziert
+    const threshold = 3.0 * sensitivityMultiplier; // Reduziert für bessere Erkennung
     
-    // Sehr strenge Erkennungskriterien:
-    // 1. Extrem hohe Abweichung von der Schwerkraft
+    // Vereinfachte Erkennungskriterien:
+    // 1. Deutliche Abweichung von der Schwerkraft (Sturz/Aufprall)
     const gravitationalDeviation = Math.abs(average - this.baselineAcceleration);
     
-    // 2. Sehr hohe Standardabweichung (nur bei starkem Schütteln)
-    const isVeryJerkyMotion = standardDeviation > (threshold * 0.8); // Viel höher als vorher
+    // 2. Hohe Standardabweichung (starkes Schütteln)
+    const isJerkyMotion = standardDeviation > 1.5; // Reduziert für bessere Erkennung
     
-    // 3. Massive Beschleunigungsänderung
-    const isVerySharpDeviation = gravitationalDeviation > threshold;
+    // 3. Hohe Beschleunigungsänderung
+    const isSharpDeviation = gravitationalDeviation > threshold;
     
-    // 4. Zusätzlich: Prüfe auf kontinuierliches starkes Schütteln
-    const maxAcceleration = Math.max(...this.motionBuffer);
-    const isExtremeAcceleration = maxAcceleration > (threshold * 1.5);
+    // DEBUG-Ausgabe für jede Messung
+    // console.log(`Sensor-Check: Accel=${totalAcceleration.toFixed(2)}, Avg=${average.toFixed(2)}, StdDev=${standardDeviation.toFixed(2)}, Dev=${gravitationalDeviation.toFixed(2)}`);
 
-    // SEHR STRENGE Motion Detection - alle Kriterien müssen erfüllt sein
-    if (isVeryJerkyMotion && isVerySharpDeviation && isExtremeAcceleration && standardDeviation > 15.0) {
-      console.log('🚨 STARKE BEWEGUNG erkannt! (Handy wurde kräftig geschüttelt)');
+    // Vereinfachte Motion Detection - ODER-Operator statt UND für bessere Erkennung
+    if (isSharpDeviation || isJerkyMotion) {
+      console.log('🚨 BEWEGUNG erkannt! (Sturz oder starkes Schütteln)');
       console.log('📊 Details:', {
         totalAcceleration: totalAcceleration.toFixed(2),
         average: average.toFixed(2),
         standardDeviation: standardDeviation.toFixed(2),
-        gravitationalDeviation: gravitationalDeviation.toFixed(2),
-        maxAcceleration: maxAcceleration.toFixed(2),
         threshold: threshold.toFixed(2),
-        isVeryJerkyMotion,
-        isVerySharpDeviation,
-        isExtremeAcceleration,
-        note: 'Nur bei sehr starkem Schütteln erkannt'
       });
-
+      
       this.lastMotionTime = currentTime;
-      this.motionBuffer = []; // Buffer nach Erkennung zurücksetzen
-      this.onMotionDetected();
+      if (this.onMotionDetected) {
+        this.onMotionDetected();
+      }
     }
   }
 
   /**
-   * Gibt den Sensitivitäts-Multiplikator zurück (alle Werte drastisch erhöht)
+   * Gibt den Sensitivitäts-Multiplikator zurück
    */
   private getSensitivityMultiplier(): number {
     switch (this.settings.sensitivity) {
-      case 'low':
-        return 3.0; // Extrem unsensibel (war 1.5)
-      case 'medium':
-        return 2.0; // Sehr unsensibel (war 1.0)
       case 'high':
-        return 1.5; // Immer noch unsensibel (war 0.7)
+        return 0.8; // Sensibler
+      case 'medium':
+        return 1.0; // Standard
+      case 'low':
+        return 1.5; // Weniger sensibel
       default:
-        return 2.0;
+        return 1.2;
     }
   }
 
   /**
-   * Aktualisiert die Sensor-Einstellungen mit erhöhten Cooldowns
+   * Aktualisiert die Sensor-Einstellungen
    */
   public updateSettings(settings: Partial<SensorSettings>): void {
     this.settings = { ...this.settings, ...settings };
     
-    // Deutlich längere Cooldowns für weniger Auslösungen
+    // Cooldowns je nach Sensitivität
     switch (this.settings.sensitivity) {
       case 'low':
-        this.motionCooldown = 15000; // 15 Sekunden (war 8)
+        this.motionCooldown = 15000; // 15 Sekunden
         break;
       case 'medium':
-        this.motionCooldown = 12000; // 12 Sekunden (war 5)
+        this.motionCooldown = 10000; // 10 Sekunden
         break;
       case 'high':
-        this.motionCooldown = 10000; // 10 Sekunden (war 3)
+        this.motionCooldown = 8000; // 8 Sekunden
         break;
     }
 
-    console.log('⚙️ Sensor-Einstellungen aktualisiert (UNSENSIBEL):', this.settings);
+    console.log('⚙️ Sensor-Einstellungen aktualisiert (UNSENSIBLER):', this.settings);
     console.log('⏱️ Neuer Cooldown:', this.motionCooldown + 'ms');
   }
 

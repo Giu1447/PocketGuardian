@@ -66,12 +66,10 @@ export class NewFeaturesTester {
   static async testCameraReadiness() {
     console.log('🧪 Teste Kamera-Bereitschaft...');
     
-    const isDualAvailable = cameraService.isDualCameraAvailable();
     const isAvailable = cameraService.isAvailable();
     const permissions = cameraService.getPermissionStatus();
     
     console.log('Kamera-Status:', {
-      isDualAvailable,
       isAvailable,
       permissions
     });

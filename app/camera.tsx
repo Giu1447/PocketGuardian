@@ -9,24 +9,22 @@ import { StyleSheet, View } from 'react-native';
 import { Button, Card, Surface, Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cameraService } from '../src/services';
-import { DualCapturedImages } from '../src/types';
+import { EmergencyData } from '../src/types';
 import { formatDate } from '../src/utils/helpers';
 
 export default function CameraScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const frontCameraRef = useRef<any>(null);
-  const backCameraRef = useRef<any>(null);
   
   const [isCapturing, setIsCapturing] = useState(false);
-  const [lastPhotos, setLastPhotos] = useState<DualCapturedImages | null>(null);
-  const [camerasReady, setCamerasReady] = useState({ front: false, back: false });
+  const [lastVideo, setLastVideo] = useState<EmergencyData | null>(null);
+  const [camerasReady, setCamerasReady] = useState({ front: false });
 
   // Initial setup der Kamera-Referenzen
   useEffect(() => {
     const timer = setTimeout(() => {
       cameraService.setFrontCameraRef(frontCameraRef.current);
-      cameraService.setBackCameraRef(backCameraRef.current);
     }, 100);
 
     return () => clearTimeout(timer);
@@ -41,99 +39,53 @@ export default function CameraScreen() {
     cameraService.setFrontCameraReady();
   };
 
-  const handleBackCameraReady = () => {
-    console.log('✅ Back-Kamera bereit (Camera Screen)');
-    setCamerasReady(prev => ({ ...prev, back: true }));
-    cameraService.setBackCameraReady();
-  };
-
   /**
-   * Nimmt Dual-Kamera-Fotos auf
+   * Nimmt ein 5-Sekunden-Notfallvideo auf
    */
-  const captureDualPhoto = async () => {
+  const captureEmergencyVideo = async () => {
     if (isCapturing) return;
 
-    // Prüfe ob mindestens eine Kamera bereit ist
-    if (!camerasReady.front && !camerasReady.back) {
-      console.warn('⚠️ Keine Kamera bereit für Aufnahme');
+    // Prüfe ob die Kamera bereit ist
+    if (!camerasReady.front) {
+      console.warn('⚠️ Kamera nicht bereit für Aufnahme');
       return;
     }
 
     try {
       setIsCapturing(true);
-      console.log('📸 Manuelle Dual-Kamera-Aufnahme...');
+      console.log('🎥 Manuelle Video-Aufnahme...');
 
-      // Setze Kamera-Referenzen für den Service
+      // Setze Kamera-Referenz für den Service
       cameraService.setFrontCameraRef(frontCameraRef.current);
-      cameraService.setBackCameraRef(backCameraRef.current);
 
-      // Führe Dual-Kamera-Aufnahme durch
-      const dualImages = await cameraService.captureDualPhoto();
+      // Führe Video-Aufnahme durch
+      const emergencyData = await cameraService.captureEmergencyVideo();
 
-      if (!dualImages) {
-        throw new Error('Dual-Kamera-Aufnahme fehlgeschlagen');
+      if (!emergencyData) {
+        throw new Error('Video-Aufnahme fehlgeschlagen');
       }
 
-      setLastPhotos(dualImages);
-      console.log('✅ Dual-Fotos erfolgreich aufgenommen');
+      setLastVideo(emergencyData);
+      console.log('✅ Video erfolgreich aufgenommen');
 
     } catch (error) {
-      console.error('❌ Fehler bei Dual-Kamera-Aufnahme:', error);
+      console.error('❌ Fehler bei Video-Aufnahme:', error);
     } finally {
       setIsCapturing(false);
     }
   };
 
   /**
-   * Legacy-Einzelkamera-Aufnahme
-   */
-  const capturePhoto = async () => {
-    if (isCapturing || !backCameraRef.current) return;
-
-    try {
-      setIsCapturing(true);
-      console.log('📸 Manuelle Fotoaufnahme...');
-
-      const photo = await backCameraRef.current.takePictureAsync({
-        quality: 0.8,
-        base64: false,
-        exif: true,
-      });
-
-      const capturedImage = {
-        uri: photo.uri,
-        timestamp: Date.now(),
-        location: undefined, // Location würde hier erfasst werden
-        camera: 'back' as const,
-      };
-
-      // Konvertiere zu DualCapturedImages Format
-      const dualImages: DualCapturedImages = {
-        backImage: capturedImage,
-        timestamp: capturedImage.timestamp,
-      };
-
-      setLastPhotos(dualImages);
-      console.log('✅ Foto erfolgreich aufgenommen:', photo.uri);
-
-    } catch (error) {
-      console.error('❌ Fehler bei Fotoaufnahme:', error);
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  /**
-   * Navigiert zum Alert Screen mit den aufgenommenen Fotos
+   * Navigiert zum Alert Screen mit dem aufgenommenen Video
    */
   const sendAsEmergency = () => {
-    if (!lastPhotos) return;
+    if (!lastVideo) return;
 
     router.push({
       pathname: '/alert',
       params: {
         type: 'manual',
-        timestamp: lastPhotos.timestamp.toString()
+        timestamp: lastVideo.timestamp.toString()
       }
     });
   };
@@ -157,42 +109,33 @@ export default function CameraScreen() {
       }
     ]}>
       {/* Header */}
-      <Surface style={styles.header}>
-        <Text variant="headlineSmall" style={styles.title}>
-          📷 Kamera
-        </Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
-          Manuelle Fotoaufnahme
-        </Text>
-      </Surface>
+      <View style={{ overflow: 'hidden', borderRadius: 8, marginBottom: 16 }}>
+        <Surface style={styles.header}>
+          <Text variant="headlineSmall" style={styles.title}>
+            🎥 Kamera
+          </Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>
+            Manuelle Videoaufnahme
+          </Text>
+        </Surface>
+      </View>
 
       {/* Kamera */}
       <View style={styles.cameraContainer}>
-        <View style={{ flex: 1, flexDirection: 'row' }}>
+        <View style={{ flex: 1 }}>
           <CameraView
             ref={frontCameraRef}
-            style={[styles.camera, { flex: 1, marginRight: 2 }]}
+            style={styles.camera}
             facing="front"
             onCameraReady={handleFrontCameraReady}
           />
-          <CameraView
-            ref={backCameraRef}
-            style={[styles.camera, { flex: 1, marginLeft: 2 }]}
-            facing="back"
-            onCameraReady={handleBackCameraReady}
-          />
         </View>
         <View style={{ 
-          flexDirection: 'row', 
-          justifyContent: 'space-between', 
           padding: 8, 
           backgroundColor: 'rgba(0,0,0,0.7)' 
         }}>
-          <Text variant="bodySmall" style={{ color: 'white', flex: 1, textAlign: 'center' }}>
+          <Text variant="bodySmall" style={{ color: 'white', textAlign: 'center' }}>
             Frontkamera {camerasReady.front ? '✅' : '⏳'}
-          </Text>
-          <Text variant="bodySmall" style={{ color: 'white', flex: 1, textAlign: 'center' }}>
-            Rückkamera {camerasReady.back ? '✅' : '⏳'}
           </Text>
         </View>
       </View>
@@ -202,23 +145,22 @@ export default function CameraScreen() {
         <Card.Content>
           <Button
             mode="contained"
-            onPress={captureDualPhoto}
-            disabled={isCapturing || (!camerasReady.front && !camerasReady.back)}
+            onPress={captureEmergencyVideo}
+            disabled={isCapturing || !camerasReady.front}
             style={styles.captureButton}
-            icon="camera"
+            icon="video"
             loading={isCapturing}
           >
-            {isCapturing ? 'Dual-Aufnahme läuft...' : 
-             (!camerasReady.front && !camerasReady.back) ? 'Kameras werden vorbereitet...' :
-             'Dual-Fotos aufnehmen'}
+            {isCapturing ? 'Video-Aufnahme läuft...' : 
+             !camerasReady.front ? 'Kamera wird vorbereitet...' :
+             '5-Sekunden-Video aufnehmen'}
           </Button>
 
-          {lastPhotos && (
+          {lastVideo && (
             <>
               <Text variant="bodyMedium" style={styles.photoInfo}>
-                ✅ Letzte Aufnahme: {formatDate(lastPhotos.timestamp)}
-                {lastPhotos.frontImage && lastPhotos.backImage ? ' (Beide Kameras)' : 
-                 lastPhotos.frontImage ? ' (Frontkamera)' : ' (Rückkamera)'}
+                ✅ Letzte Aufnahme: {formatDate(lastVideo.timestamp)}
+                {lastVideo.frontVideo ? ` (${Math.round(lastVideo.frontVideo.duration / 1000)} Sekunden Video)` : ''}
               </Text>
               
               <View style={styles.buttonRow}>
@@ -243,7 +185,7 @@ export default function CameraScreen() {
             </>
           )}
 
-          {!lastPhotos && (
+          {!lastVideo && (
             <Button
               mode="outlined"
               onPress={goBack}
@@ -263,9 +205,9 @@ export default function CameraScreen() {
             ℹ️ Information
           </Text>
           <Text variant="bodySmall" style={styles.infoText}>
-            Nehmen Sie manuell Fotos mit beiden Kameras auf und senden Sie sie optional als Notfall an Ihre Kontakte.
+            Nehmen Sie manuell ein 5-Sekunden-Notfallvideo auf und senden Sie es optional als Notfall an Ihre Kontakte.
             {'\n\n'}
-            Die Fotos werden mit Zeitstempel und Standort (falls verfügbar) gespeichert. Dual-Kamera-Aufnahmen bieten umfassendere Dokumentation.
+            Das Video wird mit Zeitstempel gespeichert und dokumentiert die aktuelle Situation in Echtzeit.
           </Text>
         </Card.Content>
       </Card>

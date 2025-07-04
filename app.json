@@ -14,11 +14,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "PocketGuardian benötigt Kamera-Zugriff für automatische Sicherheitsfotos bei Bewegungserkennung.",
         "NSMotionUsageDescription": "PocketGuardian benötigt Accelerometer-Zugriff für die Bewegungserkennung.",
-        "NSPhotoLibraryUsageDescription": "PocketGuardian speichert Sicherheitsfotos in Ihrer Fotobibliothek.",
-        "UIBackgroundModes": [
-          "background-fetch",
-          "background-processing"
-        ]
+        "NSPhotoLibraryUsageDescription": "PocketGuardian speichert Sicherheitsfotos in Ihrer Fotobibliothek."
       }
     },
     "android": {
@@ -32,10 +28,7 @@
         "CAMERA",
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE",
-        "VIBRATE",
-        "WAKE_LOCK",
-        "RECEIVE_BOOT_COMPLETED",
-        "FOREGROUND_SERVICE"
+        "VIBRATE"
       ]
     },
     "web": {

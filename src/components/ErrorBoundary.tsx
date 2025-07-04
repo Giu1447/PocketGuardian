@@ -46,30 +46,32 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     if (this.state.hasError) {
       return (
         <View style={styles.container}>
-          <Surface style={styles.errorContainer}>
-            <Text style={styles.title}>🛡️ PocketGuardian</Text>
-            <Text style={styles.errorTitle}>⚠️ Unerwarteter Fehler</Text>
-            <Text style={styles.errorMessage}>
-              Ein Fehler ist aufgetreten, aber die App ist noch funktionsfähig.
-            </Text>
-            
-            {__DEV__ && (
-              <View style={styles.debugContainer}>
-                <Text style={styles.debugTitle}>Debug-Info:</Text>
-                <Text style={styles.debugText}>
-                  {this.state.error?.toString()}
-                </Text>
-              </View>
-            )}
-            
-            <Button
-              mode="contained"
-              onPress={this.handleRestart}
-              style={styles.restartButton}
-            >
-              App neu starten
-            </Button>
-          </Surface>
+          <View style={{ overflow: 'hidden', borderRadius: 8 }}>
+            <Surface style={styles.errorContainer}>
+              <Text style={styles.title}>🛡️ PocketGuardian</Text>
+              <Text style={styles.errorTitle}>⚠️ Unerwarteter Fehler</Text>
+              <Text style={styles.errorMessage}>
+                Ein Fehler ist aufgetreten, aber die App ist noch funktionsfähig.
+              </Text>
+              
+              {__DEV__ && (
+                <View style={styles.debugContainer}>
+                  <Text style={styles.debugTitle}>Debug-Info:</Text>
+                  <Text style={styles.debugText}>
+                    {this.state.error?.toString()}
+                  </Text>
+                </View>
+              )}
+              
+              <Button
+                mode="contained"
+                onPress={this.handleRestart}
+                style={styles.restartButton}
+              >
+                App neu starten
+              </Button>
+            </Surface>
+          </View>
         </View>
       );
     }

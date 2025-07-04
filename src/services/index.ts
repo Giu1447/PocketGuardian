@@ -2,7 +2,7 @@
  * Service-Exports für einfache Imports
  */
 
-export { default as backgroundTaskService } from './backgroundTaskService';
+export { default as audioService } from './audioService';
 export { default as cameraService } from './cameraService';
 export { emailService } from './emailService';
 export { default as emergencyService } from './emergencyService';

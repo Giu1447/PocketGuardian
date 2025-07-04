@@ -271,6 +271,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   return (
     <ScrollView 
       style={[styles.container, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={{ paddingBottom: 80 }}
       showsVerticalScrollIndicator={false}
     >
       {/* App-Einstellungen */}
@@ -527,6 +528,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   bottomSpacer: {
-    height: 40,
+    height: 80,
   },
 });

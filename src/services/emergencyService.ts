@@ -2,7 +2,7 @@
  * Emergency-Service für Notfallkontakte und Datenübertragung
  */
 
-import { CapturedImage, DualCapturedImages, EmergencyContact } from '../types';
+import { CapturedImage, EmergencyContact, EmergencyData } from '../types';
 import { formatDate } from '../utils/helpers';
 import { emailService } from './emailService';
 
@@ -111,12 +111,11 @@ class EmergencyService {
   }
 
   /**
-   * Sendet Notfall-E-Mails an alle Kontakte mit E-Mail-Adressen (Dual-Kamera Version)
+   * Sendet Notfall-E-Mails an alle Kontakte mit E-Mail-Adressen
    */
-  public async sendEmergencyEmailToAllWithDualImages(
+  public async sendEmergencyEmailToAllWithVideo(
     contacts: EmergencyContact[],
-    dualImages?: DualCapturedImages,
-    location?: { latitude: number; longitude: number }
+    emergencyData?: EmergencyData
   ): Promise<boolean> {
     const emailContacts = contacts.filter(contact => contact.email);
     
@@ -125,29 +124,36 @@ class EmergencyService {
       return false;
     }
 
-    console.log(`📧 Sende Dual-Kamera Notfall-E-Mails an ${emailContacts.length} Kontakte...`);
+    console.log(`📧 Sende Video Notfall-E-Mails an ${emailContacts.length} Kontakte...`);
 
     try {
-      const emergencyData = {
+      // Für die Integration mit dem bestehenden E-Mail-Service:
+      // Wir verwenden ein Dummy-Image mit dem Video-URI
+      const dummyImage: CapturedImage | undefined = emergencyData?.frontVideo ? {
+        uri: emergencyData.frontVideo.uri,
+        timestamp: emergencyData.timestamp,
+        camera: 'front'
+      } : undefined;
+
+      const emailData = {
         timestamp: new Date(),
-        photoUri: dualImages?.backImage?.uri || dualImages?.frontImage?.uri,
-        frontPhotoUri: dualImages?.frontImage?.uri,
-        backPhotoUri: dualImages?.backImage?.uri,
-        location: location || dualImages?.location,
-        deviceInfo: `PocketGuardian Mobile App - Dual-Kamera Aufnahme`,
+        photoUri: dummyImage?.uri,
+        videoUri: emergencyData?.frontVideo?.uri,
+        location: emergencyData?.location,
+        deviceInfo: `PocketGuardian Mobile App - Notfall-Video (${emergencyData?.frontVideo?.duration ? Math.round(emergencyData.frontVideo.duration / 1000) : '?'} Sekunden)`,
       };
 
-      const success = await emailService.sendEmergencyEmailWithDualImages(emailContacts, emergencyData);
+      const success = await emailService.sendEmergencyEmail(emailContacts, emailData);
       
       if (success) {
-        console.log('✅ Dual-Kamera Notfall-E-Mails erfolgreich gesendet');
+        console.log('✅ Video Notfall-E-Mails erfolgreich gesendet');
         return true;
       } else {
-        console.log('❌ Fehler beim Senden der Dual-Kamera Notfall-E-Mails');
+        console.log('❌ Fehler beim Senden der Video Notfall-E-Mails');
         return false;
       }
     } catch (error) {
-      console.error('Fehler beim Senden der Dual-Kamera Notfall-E-Mails:', error);
+      console.error('❌ Fehler beim Senden der Video Notfall-E-Mails:', error);
       return false;
     }
   }
@@ -192,135 +198,7 @@ class EmergencyService {
     }
   }
 
-  /**
-   * Vollständige Notfall-Prozedur mit Dual-Kamera - Verbessert gegen Abstürze
-   */
-  public async executeEmergencyProcedureWithDualCamera(
-    dualImages: DualCapturedImages,
-    contacts: EmergencyContact[]
-  ): Promise<{ success: boolean; results: Array<{ contact: string; success: boolean }> }> {
-    console.log('🚨 Starte Dual-Kamera Notfall-Prozedur...');
 
-    if (!contacts || contacts.length === 0) {
-      console.log('❌ Keine Notfallkontakte definiert');
-      return { success: false, results: [] };
-    }
-
-    if (!dualImages || (!dualImages.frontImage && !dualImages.backImage)) {
-      console.log('❌ Keine gültigen Bilder für Notfallprozedur');
-      return { success: false, results: [] };
-    }
-
-    const results: Array<{ contact: string; success: boolean }> = [];
-    
-    // Verwende Promise.allSettled für bessere Fehlerresistenz
-    const contactPromises = contacts.map(async (contact) => {
-      try {
-        console.log(`🔄 Verarbeite Kontakt: ${contact.name}`);
-
-        // Erstelle Notfallnachricht mit Fallback
-        let emergencyMessage: string;
-        try {
-          emergencyMessage = this.createDualCameraEmergencyMessage(dualImages);
-        } catch (error) {
-          console.warn('Fallback auf einfache Notfallnachricht:', error);
-          emergencyMessage = '🚨 NOTFALL! PocketGuardian hat eine unerwartete Bewegung erkannt.';
-        }
-        
-        // Versuche verschiedene Kommunikationswege
-        let contactSuccess = false;
-        const attemptResults: string[] = [];
-
-        // 1. Versuche Dual-Bilder zu senden (prioritär das Rückkamera-Bild)
-        try {
-          const primaryImage = dualImages.backImage || dualImages.frontImage;
-          if (primaryImage) {
-            const imageSuccess = await this.sendImageToContact(primaryImage, contact);
-            if (imageSuccess) {
-              contactSuccess = true;
-              attemptResults.push('Bild gesendet');
-            }
-          }
-        } catch (error) {
-          console.warn(`Bild-Versand an ${contact.name} fehlgeschlagen:`, error);
-          attemptResults.push('Bild-Fehler');
-        }
-
-        // 2. Versuche SMS zu senden
-        try {
-          const smsSuccess = await this.sendEmergencySMS(contact, emergencyMessage);
-          if (smsSuccess) {
-            contactSuccess = true;
-            attemptResults.push('SMS gesendet');
-          }
-        } catch (error) {
-          console.warn(`SMS an ${contact.name} fehlgeschlagen:`, error);
-          attemptResults.push('SMS-Fehler');
-        }
-
-        // 3. Versuche E-Mail mit Dual-Kamera-Bildern zu senden (falls vorhanden)
-        try {
-          if (contact.email) {
-            const emailSuccess = await this.sendEmergencyEmailToAllWithDualImages([contact], dualImages);
-            if (emailSuccess) {
-              contactSuccess = true;
-              attemptResults.push('E-Mail gesendet');
-            }
-          }
-        } catch (error) {
-          console.warn(`E-Mail an ${contact.name} fehlgeschlagen:`, error);
-          attemptResults.push('E-Mail-Fehler');
-        }
-
-        console.log(`✅ Kontakt ${contact.name} verarbeitet: ${attemptResults.join(', ')}`);
-        
-        return {
-          contact: contact.name,
-          success: contactSuccess,
-        };
-
-      } catch (error) {
-        console.error(`❌ Kritischer Fehler bei Kontakt ${contact.name}:`, error);
-        return {
-          contact: contact.name,
-          success: false,
-        };
-      }
-    });
-
-    // Warte auf alle Kontakt-Versuche (maximal 30 Sekunden pro Kontakt)
-    try {
-      const contactResults = await Promise.allSettled(contactPromises);
-      
-      contactResults.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          results.push(result.value);
-        } else {
-          console.error(`Kontakt ${index} vollständig fehlgeschlagen:`, result.reason);
-          results.push({
-            contact: contacts[index]?.name || `Kontakt ${index}`,
-            success: false,
-          });
-        }
-      });
-    } catch (error) {
-      console.error('❌ Kritischer Fehler bei Notfallprozedur:', error);
-      // Erstelle Fallback-Ergebnis
-      contacts.forEach(contact => {
-        results.push({
-          contact: contact.name,
-          success: false,
-        });
-      });
-    }
-
-    const overallSuccess = results.some(r => r.success);
-    const successCount = results.filter(r => r.success).length;
-    
-    console.log(`🏁 Dual-Kamera Notfall-Prozedur abgeschlossen. Erfolg: ${overallSuccess} (${successCount}/${results.length} Kontakte)`);
-
-    return { success: overallSuccess, results };
-  }
 
   /**
    * Vollständige Notfall-Prozedur (Legacy Version)
@@ -378,26 +256,129 @@ class EmergencyService {
   }
 
   /**
-   * Erstellt eine Notfallnachricht für Dual-Kamera
+   * Vollständige Notfall-Prozedur mit Video
    */
-  private createDualCameraEmergencyMessage(dualImages: DualCapturedImages): string {
-    const timestamp = formatDate(dualImages.timestamp);
-    const hasFront = !!dualImages.frontImage;
-    const hasBack = !!dualImages.backImage;
-    
-    let cameraInfo = '';
-    if (hasFront && hasBack) {
-      cameraInfo = 'Fotos mit beiden Kameras';
-    } else if (hasFront) {
-      cameraInfo = 'Foto mit Frontkamera';
-    } else if (hasBack) {
-      cameraInfo = 'Foto mit Rückkamera';
-    } else {
-      cameraInfo = 'Kamera-Aufnahme';
+  public async executeEmergencyProcedureWithVideo(
+    emergencyData: EmergencyData,
+    contacts: EmergencyContact[]
+  ): Promise<{ success: boolean; results: Array<{ contact: string; success: boolean }> }> {
+    console.log('🚨 Starte Video-Notfall-Prozedur...');
+
+    if (!contacts || contacts.length === 0) {
+      console.log('❌ Keine Notfallkontakte definiert');
+      return { success: false, results: [] };
     }
 
-    return `🚨 NOTFALL ALERT: PocketGuardian hat eine unerwartete Bewegung erkannt am ${timestamp}. ${cameraInfo} wurde automatisch erstellt.`;
+    if (!emergencyData || !emergencyData.frontVideo) {
+      console.log('❌ Kein gültiges Video für Notfallprozedur');
+      return { success: false, results: [] };
+    }
+
+    const results: Array<{ contact: string; success: boolean }> = [];
+    
+    // Verwende Promise.allSettled für bessere Fehlerresistenz
+    const contactPromises = contacts.map(async (contact) => {
+      try {
+        console.log(`🔄 Verarbeite Kontakt: ${contact.name}`);
+
+        // Erstelle Notfallnachricht mit Fallback
+        let emergencyMessage: string;
+        try {
+          emergencyMessage = this.createVideoEmergencyMessage(emergencyData);
+        } catch (error) {
+          console.warn('Fallback auf einfache Notfallnachricht:', error);
+          emergencyMessage = '🚨 NOTFALL! PocketGuardian hat eine unerwartete Bewegung erkannt.';
+        }
+        
+        // Versuche verschiedene Kommunikationswege
+        let contactSuccess = false;
+        const attemptResults: string[] = [];
+
+        // 1. Versuche SMS zu senden
+        try {
+          const smsSuccess = await this.sendEmergencySMS(contact, emergencyMessage);
+          if (smsSuccess) {
+            contactSuccess = true;
+            attemptResults.push('SMS gesendet');
+          }
+        } catch (error) {
+          console.warn(`SMS an ${contact.name} fehlgeschlagen:`, error);
+          attemptResults.push('SMS-Fehler');
+        }
+
+        // 2. Versuche E-Mail mit Video zu senden (falls vorhanden)
+        try {
+          if (contact.email && emergencyData.frontVideo) {
+            // Hier würde eine sendEmergencyEmailWithVideo-Methode aufgerufen werden
+            // Für jetzt verwenden wir die existierende Methode mit dem Video-URI
+            const tempImage: CapturedImage = {
+              uri: emergencyData.frontVideo.uri,
+              timestamp: emergencyData.timestamp,
+              camera: 'front'
+            };
+            
+            const emailSuccess = await this.sendEmergencyEmailToAll([contact], tempImage);
+            if (emailSuccess) {
+              contactSuccess = true;
+              attemptResults.push('E-Mail mit Video-Link gesendet');
+            }
+          }
+        } catch (error) {
+          console.warn(`E-Mail an ${contact.name} fehlgeschlagen:`, error);
+          attemptResults.push('E-Mail-Fehler');
+        }
+
+        console.log(`✅ Kontakt ${contact.name} verarbeitet: ${attemptResults.join(', ')}`);
+        
+        return {
+          contact: contact.name,
+          success: contactSuccess,
+        };
+
+      } catch (error) {
+        console.error(`❌ Kritischer Fehler bei Kontakt ${contact.name}:`, error);
+        return {
+          contact: contact.name,
+          success: false,
+        };
+      }
+    });
+
+    // Warte auf alle Kontakt-Versuche
+    try {
+      const contactResults = await Promise.allSettled(contactPromises);
+      
+      contactResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        } else {
+          console.error(`Kontakt ${index} vollständig fehlgeschlagen:`, result.reason);
+          results.push({
+            contact: contacts[index]?.name || `Kontakt ${index}`,
+            success: false,
+          });
+        }
+      });
+    } catch (error) {
+      console.error('❌ Kritischer Fehler bei Notfallprozedur:', error);
+      // Erstelle Fallback-Ergebnis
+      contacts.forEach(contact => {
+        results.push({
+          contact: contact.name,
+          success: false,
+        });
+      });
+    }
+
+    const overallSuccess = results.some(r => r.success);
+    const successCount = results.filter(r => r.success).length;
+    
+    console.log(`🏁 Video-Notfall-Prozedur abgeschlossen. Erfolg: ${overallSuccess} (${successCount}/${results.length} Kontakte)`);
+
+    return { success: overallSuccess, results };
   }
+
+
 
   /**
    * Erstellt eine Notfallnachricht (Legacy Version)
@@ -405,6 +386,18 @@ class EmergencyService {
   private createEmergencyMessage(image: CapturedImage): string {
     const timestamp = formatDate(image.timestamp);
     return `🚨 NOTFALL ALERT: PocketGuardian hat eine unerwartete Bewegung erkannt am ${timestamp}. Sicherheitsfoto wurde automatisch erstellt.`;
+  }
+
+  /**
+   * Erstellt eine Notfallnachricht für Video
+   */
+  private createVideoEmergencyMessage(emergencyData: EmergencyData): string {
+    const timestamp = formatDate(emergencyData.timestamp);
+    const videoDuration = emergencyData.frontVideo?.duration 
+      ? `${Math.round(emergencyData.frontVideo.duration / 1000)} Sekunden` 
+      : "kurzes";
+    
+    return `🚨 NOTFALL ALERT: PocketGuardian hat eine unerwartete Bewegung erkannt am ${timestamp}. Ein ${videoDuration} Notfall-Video wurde automatisch aufgenommen.`;
   }
 
   /**

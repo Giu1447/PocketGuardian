@@ -1,17 +1,16 @@
 /**
  * Home Screen - Hauptbildschirm der PocketGuardian App (Expo Router)
- * STABILISIERTE VERSION für bessere Performance und Responsivität
+ * BEREINIGT: Ohne Hintergrundaktivitäten und Rückkamera-Logik
  */
 
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View, Dimensions } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, AppState, AppStateStatus, Dimensions, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Surface, Switch, Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  backgroundTaskService,
+  audioService,
   cameraService,
-  emergencyService,
   notificationService,
   sensorService
 } from '../../src/services';
@@ -24,10 +23,11 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [backgroundStatus, setBackgroundStatus] = useState<string>('Unbekannt');
   const [isPocketMode, setIsPocketMode] = useState(false);
   const [autoModeEnabled, setAutoModeEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [sensorData, setSensorData] = useState<any>(null); // NEU: Für Debug-Daten
+  const appState = useRef(AppState.currentState);
 
   // Dummy-Einstellungen (würden normalerweise aus AsyncStorage kommen)
   const [settings] = useState<AppSettings>({
@@ -50,16 +50,41 @@ export default function HomeScreen() {
 
   useEffect(() => {
     initializeServices();
-    checkBackgroundStatus();
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   /**
-   * Initialisiert alle Services - Vereinfacht für Stabilität
+   * Handler für App-Zustandsänderungen
+   */
+  const handleAppStateChange = useCallback((status: AppStateStatus) => {
+    appState.current = status;
+    
+    if (status === 'active') {
+      // App kommt in den Vordergrund
+      console.log('🌼 App aktiv');
+    } else {
+      // App geht in den Hintergrund
+      console.log('🌙 App inaktiv - stoppe Überwachung');
+      if (isMonitoring) {
+        toggleMonitoring();
+      }
+    }
+  }, [isMonitoring]);
+
+  /**
+   * Initialisiert alle Services - Vereinfacht ohne Hintergrundaktivitäten
    */
   const initializeServices = async () => {
     try {
       setIsLoading(true);
-      console.log('🚀 Initialisiere Services (stabilisiert)...');
+      console.log('🚀 Initialisiere Services (ohne Hintergrundaktivitäten)...');
 
       // Sequentielle Initialisierung für Stabilität
       let sensorInit = false;
@@ -115,19 +140,6 @@ export default function HomeScreen() {
   };
 
   /**
-   * Überprüft den Background-Status - Vereinfacht
-   */
-  const checkBackgroundStatus = async () => {
-    try {
-      const status = await backgroundTaskService.getBackgroundStatus();
-      setBackgroundStatus(status.status);
-    } catch (error) {
-      console.error('❌ Fehler beim Background-Status:', error);
-      setBackgroundStatus('Fehler');
-    }
-  };
-
-  /**
    * Handler für Pocket-Status-Änderungen (automatische Aktivierung/Deaktivierung)
    */
   const handlePocketStateChange = async (inPocket: boolean) => {
@@ -177,7 +189,7 @@ export default function HomeScreen() {
   };
 
   /**
-   * Startet/Stoppt die Bewegungsüberwachung - Vereinfacht
+   * Startet/Stoppt die Bewegungsüberwachung - Ohne Hintergrundaktivitäten
    */
   const toggleMonitoring = async () => {
     if (isLoading) return;
@@ -188,8 +200,8 @@ export default function HomeScreen() {
       if (isMonitoring) {
         // Stoppe Überwachung
         sensorService.stopMonitoring();
-        await backgroundTaskService.stopBackgroundMonitoring();
         setIsMonitoring(false);
+        setSensorData(null); // Debug-Daten zurücksetzen
         console.log('⏹️ Überwachung gestoppt');
         
         try {
@@ -203,17 +215,18 @@ export default function HomeScreen() {
         }
         
       } else {
-        // Starte Überwachung
-        sensorService.updateSettings(settings.sensorSettings);
-        
-        sensorService.startMonitoring(async () => {
-          console.log('🚨 Bewegung erkannt! Starte Notfallprotokoll...');
-          await handleEmergency();
+        // Aktiviere Sensor-Einstellungen und starte Überwachung
+        sensorService.updateSettings({
+          isEnabled: true,
+          sensitivity: 'medium'
         });
         
-        await backgroundTaskService.startBackgroundMonitoring();
+        // Starte Überwachung mit Debug-Callback
+        sensorService.startMonitoring(handleMotionDetected, (data) => {
+          setSensorData(data);
+        });
         setIsMonitoring(true);
-        console.log('✅ Überwachung gestartet');
+        console.log('▶️ Überwachung gestartet');
         
         try {
           await notificationService.showLocalNotification({
@@ -238,19 +251,37 @@ export default function HomeScreen() {
   };
 
   /**
-   * Behandelt Notfälle - Vereinfacht
+   * Wird aufgerufen, wenn eine Bewegung erkannt wird
+   */
+  const handleMotionDetected = () => {
+    console.log('🚨 BEWEGUNG ERKANNT IN HOME SCREEN');
+    // Sofort Alarm-Sound abspielen für schnellere Reaktion
+    audioService.playAlarmSound(true).catch((error: any) => {
+      console.error('❌ Audio-Fehler:', error);
+    });
+    handleEmergency();
+  };
+
+  /**
+   * Behandelt Notfälle - Vereinfacht mit nur Frontkamera
    */
   const handleEmergency = async () => {
     try {
       console.log('🚨 Notfall-Handler gestartet');
       
-      // Sofort zu Alert-Screen navigieren
-      router.push('/alert');
+      // Navigiere mit Parametern für bessere Stabilität
+      router.push({
+        pathname: '/alert',
+        params: {
+          type: 'motion',
+          timestamp: Date.now().toString()
+        }
+      });
       
       // Kamera-Aufnahme im Hintergrund
       setTimeout(async () => {
         try {
-          await cameraService.captureDualPhoto();
+          await cameraService.captureEmergencyVideo();
         } catch (error) {
           console.error('❌ Kamera-Fehler:', error);
         }
@@ -293,12 +324,14 @@ export default function HomeScreen() {
   if (!isInitialized) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <Surface style={styles.loadingContainer}>
-          <Text variant="headlineSmall">🛡️ PocketGuardian</Text>
-          <Text variant="bodyMedium" style={styles.loadingText}>
-            Initialisiere Services...
-          </Text>
-        </Surface>
+        <View style={{ overflow: 'hidden', borderRadius: 12 }}>
+          <Surface style={styles.loadingContainer}>
+            <Text variant="headlineSmall">🛡️ PocketGuardian</Text>
+            <Text variant="bodyMedium" style={styles.loadingText}>
+              Initialisiere Services...
+            </Text>
+          </Surface>
+        </View>
       </View>
     );
   }
@@ -310,14 +343,16 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
-      <Surface style={styles.headerContainer}>
-        <Text variant="headlineMedium" style={styles.title}>
-          🛡️ PocketGuardian
-        </Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
-          Intelligente Sicherheitsüberwachung
-        </Text>
-      </Surface>
+      <View style={{ overflow: 'hidden', borderRadius: 12, marginBottom: 16 }}>
+        <Surface style={styles.headerContainer}>
+          <Text variant="headlineMedium" style={styles.title}>
+            🛡️ PocketGuardian
+          </Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>
+            Intelligente Sicherheitsüberwachung
+          </Text>
+        </Surface>
+      </View>
 
       {/* Status Cards */}
       <View style={styles.statusGrid}>
@@ -388,12 +423,6 @@ export default function HomeScreen() {
             📊 System-Info
           </Text>
           <View style={styles.infoRow}>
-            <Text variant="bodyMedium">Background-Status:</Text>
-            <Text variant="bodyMedium" style={styles.infoValue}>
-              {backgroundStatus}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
             <Text variant="bodyMedium">Sensitivität:</Text>
             <Text variant="bodyMedium" style={styles.infoValue}>
               {settings.sensorSettings.sensitivity} ({settings.sensorSettings.threshold})
@@ -450,9 +479,36 @@ export default function HomeScreen() {
           <Text variant="bodySmall" style={styles.safetyText}>
             • Nur starkes Schütteln löst Alarm aus{'\n'}
             • Auto-Mode aktiviert bei Pocket-Erkennung{'\n'}
-            • Background-Überwachung abhängig von Gerät{'\n'}
+            • Nur Vorderkamera wird für 5 Sekunden verwendet{'\n'}
             • Notfallkontakte regelmäßig testen
           </Text>
+        </Card.Content>
+      </Card>
+
+      {/* NEU: Debug-Karte für Live-Sensor-Daten */}
+      {isMonitoring && sensorData && (
+        <Card style={styles.card}>
+          <Card.Title title="Live Sensor-Daten (Debug)" subtitle="Wird nur bei aktiver Überwachung angezeigt" />
+          <Card.Content>
+            <Text>Beschleunigung: {sensorData.totalAcceleration}</Text>
+            <Text>Im Pocket (simuliert): {sensorData.inPocket ? 'Ja' : 'Nein'}</Text>
+            <Text>Zeit seit Bewegung: {sensorData.timeSinceLastMotion?.toFixed(1)}s</Text>
+          </Card.Content>
+        </Card>
+      )}
+
+      {/* Info-Karte: Notfallkontakte */}
+      <Card style={styles.card}>
+        <Card.Title title="Notfallkontakte" subtitle={`${settings.emergencyContacts.length} Kontakt(e) hinterlegt`} />
+        <Card.Content>
+          {settings.emergencyContacts.map((contact) => (
+            <View key={contact.id} style={styles.contactRow}>
+              <Text variant="bodyMedium">{contact.name}</Text>
+              <Text variant="bodySmall" style={styles.contactInfo}>
+                {contact.phone} {contact.email ? `| ${contact.email}` : ''}
+              </Text>
+            </View>
+          ))}
         </Card.Content>
       </Card>
     </ScrollView>
@@ -565,5 +621,18 @@ const styles = StyleSheet.create({
   safetyText: {
     lineHeight: 20,
     opacity: 0.8,
+  },
+  card: {
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 2,
+  },
+  contactRow: {
+    marginVertical: 8,
+  },
+  contactInfo: {
+    marginTop: 4,
+    color: '#555',
   },
 });

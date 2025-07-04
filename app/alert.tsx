@@ -9,11 +9,12 @@ import { Animated, Alert as RNAlert, StyleSheet, View } from 'react-native';
 import { Button, Card, ProgressBar, Surface, Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+    audioService,
     cameraService,
     emergencyService,
     notificationService
 } from '../src/services';
-import { CapturedImage, DualCapturedImages, EmergencyContact } from '../src/types';
+import { CapturedImage, EmergencyContact, EmergencyData } from '../src/types';
 import { formatDate } from '../src/utils/helpers';
 
 export default function AlertScreen() {
@@ -25,16 +26,15 @@ export default function AlertScreen() {
   
   const [countdown, setCountdown] = useState(5);
   const [isCapturing, setIsCapturing] = useState(false);
-  const [capturedImages, setCapturedImages] = useState<DualCapturedImages | null>(null);
+  const [emergencyData, setEmergencyData] = useState<EmergencyData | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [sendStatus, setSendStatus] = useState<string>('');
   const [isCancelled, setIsCancelled] = useState(false);
-  const [camerasReady, setCamerasReady] = useState({ front: false, back: false });
+  const [camerasReady, setCamerasReady] = useState({ front: false });
   const [errorCount, setErrorCount] = useState(0); // Zähle Fehler um Schleifen zu vermeiden
   const [lastErrorTime, setLastErrorTime] = useState(0); // Vermeide Spam-Fehlermeldungen
   
   const frontCameraRef = useRef<any>(null);
-  const backCameraRef = useRef<any>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Dummy Notfallkontakte (würden normalerweise aus Settings kommen)
@@ -51,9 +51,13 @@ export default function AlertScreen() {
     let mounted = true; // Cleanup flag
     
     try {
+      // Starte Alarm-Sound
+      audioService.playAlarmSound(true).catch(error => {
+        console.error('❌ Fehler beim Abspielen des Alarm-Sounds:', error);
+      });
+      
       // Setze Kamera-Referenzen
       cameraService.setFrontCameraRef(frontCameraRef.current);
-      cameraService.setBackCameraRef(backCameraRef.current);
       
       // Starte Pulsanimation
       startPulseAnimation();
@@ -65,8 +69,8 @@ export default function AlertScreen() {
         setCountdown(prev => {
           if (prev <= 1 && !isCancelled) {
             // Prüfe vor Aufnahme ob Kameras bereit sind
-            if (camerasReady.front || camerasReady.back) {
-              captureDualPhoto().catch(error => {
+            if (camerasReady.front) {
+              captureEmergencyVideo().catch(error => {
                 console.error('Fehler bei automatischer Aufnahme:', error);
                 if (mounted && !isCancelled) {
                   setSendStatus('❌ Automatische Aufnahme fehlgeschlagen');
@@ -87,6 +91,11 @@ export default function AlertScreen() {
       return () => {
         mounted = false;
         clearInterval(countdownInterval);
+        
+        // Stoppe den Alarm-Sound beim Unmount
+        audioService.stopSound().catch(error => {
+          console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', error);
+        });
       };
     } catch (error) {
       console.error('Fehler bei AlertScreen useEffect:', error);
@@ -100,12 +109,6 @@ export default function AlertScreen() {
     console.log('✅ Front-Kamera bereit');
     setCamerasReady(prev => ({ ...prev, front: true }));
     cameraService.setFrontCameraReady();
-  };
-
-  const handleBackCameraReady = () => {
-    console.log('✅ Back-Kamera bereit');
-    setCamerasReady(prev => ({ ...prev, back: true }));
-    cameraService.setBackCameraReady();
   };
 
   /**
@@ -133,13 +136,17 @@ export default function AlertScreen() {
    */
   const cancelAlert = () => {
     setIsCancelled(true);
+    // Stoppe den Alarm-Sound
+    audioService.stopSound().catch(error => {
+      console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', error);
+    });
     router.back();
   };
 
   /**
-   * Nimmt Fotos mit beiden Kameras auf - Verbessert gegen Abstürze
+   * Nimmt ein Video im Notfall auf - Verbessert gegen Abstürze
    */
-  const captureDualPhoto = async () => {
+  const captureEmergencyVideo = async () => {
     if (isCapturing || isCancelled) {
       console.log('🔄 Aufnahme bereits aktiv oder abgebrochen');
       return;
@@ -155,50 +162,49 @@ export default function AlertScreen() {
 
     try {
       setIsCapturing(true);
-      setSendStatus('📸 Nehme Fotos auf...');
-      console.log('📸 Starte Dual-Kamera-Aufnahme...');
+      setSendStatus('🎥 Nehme Video auf...');
+      console.log('🎥 Starte Videoaufnahme...');
 
       // Prüfe Kamera-Status
-      if (!camerasReady.front && !camerasReady.back) {
-        throw new Error('Keine Kamera bereit');
+      if (!camerasReady.front) {
+        throw new Error('Kamera nicht bereit');
       }
 
-      // Setze Kamera-Referenzen für den Service
+  // Setze Kamera-Referenz für den Service
       cameraService.setFrontCameraRef(frontCameraRef.current);
-      cameraService.setBackCameraRef(backCameraRef.current);
 
-      // Führe Dual-Kamera-Aufnahme durch
-      const dualImages = await cameraService.captureDualPhoto();
+      // Führe Videoaufnahme durch
+      const newEmergencyData = await cameraService.captureEmergencyVideo();
 
-      if (!dualImages) {
-        throw new Error('Dual-Kamera-Aufnahme fehlgeschlagen');
+      if (!newEmergencyData) {
+        throw new Error('Videoaufnahme fehlgeschlagen');
       }
 
-      setCapturedImages(dualImages);
-      console.log('✅ Dual-Fotos erfolgreich aufgenommen');
+      setEmergencyData(newEmergencyData);
+      console.log('✅ Notfall-Video erfolgreich aufgenommen');
       
       // Reset Fehlerzähler bei Erfolg
       setErrorCount(0);
       setLastErrorTime(0);
 
       // Automatisch senden
-      sendDualImagesToEmergencyContacts(dualImages);
+      sendEmergencyVideoToContacts(newEmergencyData);
 
     } catch (error) {
-      console.error('❌ Fehler bei Dual-Kamera-Aufnahme:', error);
+      console.error('❌ Fehler bei Video-Aufnahme:', error);
       
       // Update Fehlerzähler
       setErrorCount(prev => prev + 1);
       setLastErrorTime(Date.now());
       
       // Zeige angemessene Fehlermeldung basierend auf Fehlertyp
-      let errorMessage = '❌ Fotos konnten nicht aufgenommen werden';
+      let errorMessage = '❌ Video konnte nicht aufgenommen werden';
       
       if (error instanceof Error) {
         if (error.message.includes('Kamera')) {
           errorMessage = '❌ Kamera nicht verfügbar - Bitte Berechtigungen prüfen';
         } else if (error.message.includes('bereit')) {
-          errorMessage = '⏳ Kameras werden vorbereitet - Bitte warten...';
+          errorMessage = '⏳ Kamera wird vorbereitet - Bitte warten...';
         }
       }
       
@@ -208,7 +214,20 @@ export default function AlertScreen() {
       if (errorCount < 2) {
         setTimeout(() => {
           if (!isCancelled) {
-            RNAlert.alert('Fehler', errorMessage);
+            RNAlert.alert(
+              'Fehler', 
+              errorMessage,
+              [
+                { text: 'OK', onPress: () => {
+                  // Stoppe den Alarm-Sound bei schwerwiegenden Fehlern
+                  if (errorMessage.includes('nicht verfügbar') || errorCount >= 2) {
+                    audioService.stopSound().catch(error => {
+                      console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', error);
+                    });
+                  }
+                }}
+              ]
+            );
           }
         }, 500);
       }
@@ -218,73 +237,36 @@ export default function AlertScreen() {
     }
   };
 
-  /**
-   * Legacy-Methode für Rückwärtskompatibilität
-   */
-  const capturePhoto = async () => {
-    if (isCapturing || !backCameraRef.current) return;
 
-    try {
-      setIsCapturing(true);
-      console.log('📸 Starte Fotoaufnahme...');
-
-      const photo = await backCameraRef.current.takePictureAsync({
-        quality: 0.7,
-        base64: false,
-        exif: true,
-      });
-
-      const capturedImage: CapturedImage = {
-        uri: photo.uri,
-        timestamp: Date.now(),
-        location: undefined, // Location würde hier erfasst werden
-        camera: 'back',
-      };
-
-      // Konvertiere zu DualCapturedImages Format
-      const dualImages: DualCapturedImages = {
-        backImage: capturedImage,
-        timestamp: capturedImage.timestamp,
-      };
-
-      setCapturedImages(dualImages);
-      console.log('✅ Foto erfolgreich aufgenommen');
-
-      // Automatisch senden
-      sendDualImagesToEmergencyContacts(dualImages);
-
-    } catch (error) {
-      console.error('❌ Fehler bei Fotoaufnahme:', error);
-      RNAlert.alert('Fehler', 'Foto konnte nicht aufgenommen werden');
-    } finally {
-      setIsCapturing(false);
-    }
-  };
 
   /**
-   * Sendet die Dual-Bilder an Notfallkontakte
+   * Sendet das Notfall-Video an Kontakte
    */
-  const sendDualImagesToEmergencyContacts = async (dualImages: DualCapturedImages) => {
+  const sendEmergencyVideoToContacts = async (data: EmergencyData) => {
     try {
       setIsSending(true);
       setSendStatus('Sende Notfall-Nachrichten...');
 
-      console.log('📤 Sende Dual-Kamera Notfall-Nachrichten...');
+      console.log('📤 Sende Notfall-Video-Nachrichten...');
 
-      // Führe Notfall-Prozedur mit Dual-Kamera aus
-      const result = await emergencyService.executeEmergencyProcedureWithDualCamera(dualImages, emergencyContacts);
+      // Führe Notfall-Prozedur mit Video aus
+      const result = await emergencyService.executeEmergencyProcedureWithVideo(data, emergencyContacts);
 
       if (result.success) {
         setSendStatus('✅ Notfall-Nachrichten erfolgreich gesendet!');
         
         await notificationService.showLocalNotification({
           title: '✅ Notfall-Nachrichten gesendet',
-          body: `${emergencyContacts.length} Kontakte wurden mit Dual-Kamera-Aufnahmen benachrichtigt.`,
+          body: `${emergencyContacts.length} Kontakte wurden mit Notfall-Video benachrichtigt.`,
           data: { type: 'emergency_sent' }
         });
 
         // Nach 3 Sekunden zur Hauptseite zurückkehren
         setTimeout(() => {
+          // Stoppe den Alarm-Sound
+          audioService.stopSound().catch(error => {
+            console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', error);
+          });
           router.replace('/');
         }, 3000);
 
@@ -294,8 +276,14 @@ export default function AlertScreen() {
           'Fehler',
           'Nicht alle Notfall-Nachrichten konnten gesendet werden.',
           [
-            { text: 'Wiederholen', onPress: () => sendDualImagesToEmergencyContacts(dualImages) },
-            { text: 'Zurück', onPress: () => router.back() }
+            { text: 'Wiederholen', onPress: () => sendEmergencyVideoToContacts(data) },
+            { text: 'Zurück', onPress: () => {
+              // Stoppe den Alarm-Sound
+              audioService.stopSound().catch(error => {
+                console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', error);
+              });
+              router.back();
+            }}
           ]
         );
       }
@@ -303,7 +291,18 @@ export default function AlertScreen() {
     } catch (error) {
       console.error('❌ Fehler beim Senden der Notfall-Nachrichten:', error);
       setSendStatus('❌ Fehler beim Senden');
-      RNAlert.alert('Fehler', 'Notfall-Nachrichten konnten nicht gesendet werden');
+      RNAlert.alert(
+        'Fehler', 
+        'Notfall-Nachrichten konnten nicht gesendet werden',
+        [
+          { text: 'OK', onPress: () => {
+            // Stoppe den Alarm-Sound
+            audioService.stopSound().catch(error => {
+              console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', error);
+            });
+          }}
+        ]
+      );
     } finally {
       setIsSending(false);
     }
@@ -333,6 +332,10 @@ export default function AlertScreen() {
 
         // Nach 3 Sekunden zur Hauptseite zurückkehren
         setTimeout(() => {
+          // Stoppe den Alarm-Sound
+          audioService.stopSound().catch(error => {
+            console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', error);
+          });
           router.replace('/');
         }, 3000);
 
@@ -343,7 +346,13 @@ export default function AlertScreen() {
           'Nicht alle Notfall-Nachrichten konnten gesendet werden.',
           [
             { text: 'Wiederholen', onPress: () => sendToEmergencyContacts(image) },
-            { text: 'Zurück', onPress: () => router.back() }
+            { text: 'Zurück', onPress: () => {
+              // Stoppe den Alarm-Sound
+              audioService.stopSound().catch(error => {
+                console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', error);
+              });
+              router.back();
+            }}
           ]
         );
       }
@@ -351,7 +360,18 @@ export default function AlertScreen() {
     } catch (error) {
       console.error('❌ Fehler beim Senden der Notfall-Nachrichten:', error);
       setSendStatus('❌ Fehler beim Senden');
-      RNAlert.alert('Fehler', 'Notfall-Nachrichten konnten nicht gesendet werden');
+      RNAlert.alert(
+        'Fehler', 
+        'Notfall-Nachrichten konnten nicht gesendet werden',
+        [
+          { text: 'OK', onPress: () => {
+            // Stoppe den Alarm-Sound
+            audioService.stopSound().catch(error => {
+              console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', error);
+            });
+          }}
+        ]
+      );
     } finally {
       setIsSending(false);
     }
@@ -361,10 +381,46 @@ export default function AlertScreen() {
    * Manuelles Wiederholen der Aufnahme
    */
   const retakePhoto = () => {
-    setCapturedImages(null);
+    setEmergencyData(null);
     setCountdown(3);
     setIsCancelled(false);
   };
+
+  // Alarm-Sound abspielen
+  useEffect(() => {
+    let mounted = true;
+    
+    const playAlarm = async () => {
+      try {
+        console.log('🔔 Starte Alarm-Sound...');
+        
+        // Initialisieren des Audio-Service
+        await audioService.initAudio();
+        
+        // Alarm im Loop abspielen
+        const success = await audioService.playAlarmSound(true);
+        
+        if (success) {
+          console.log('✅ Alarm-Sound wird abgespielt');
+        } else {
+          console.warn('⚠️ Alarm-Sound konnte nicht abgespielt werden');
+        }
+      } catch (error) {
+        console.error('❌ Fehler beim Abspielen des Alarm-Sounds:', error);
+      }
+    };
+    
+    // Starte Alarm-Sound
+    playAlarm();
+    
+    // Cleanup bei Komponentenabbau
+    return () => {
+      mounted = false;
+      audioService.stopSound().catch(error => {
+        console.error('❌ Fehler beim Stoppen des Alarm-Sounds:', error);
+      });
+    };
+  }, []); // Leerer Dependency-Array = nur beim Mounting
 
   if (isCancelled) {
     return null;
@@ -382,73 +438,64 @@ export default function AlertScreen() {
       }
     ]}>
       {/* Header */}
-      <Surface style={[styles.header, { backgroundColor: theme.colors.errorContainer }]}>
-        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-          <Text variant="headlineMedium" style={[styles.alertTitle, { color: theme.colors.onErrorContainer }]}>
-            🚨 NOTFALL ERKANNT!
+      <View style={{ overflow: 'hidden', borderRadius: 8, marginBottom: 16 }}>
+        <Surface style={[styles.header, { backgroundColor: theme.colors.errorContainer }]}>
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <Text variant="headlineMedium" style={[styles.alertTitle, { color: theme.colors.onErrorContainer }]}>
+              🚨 NOTFALL ERKANNT!
+            </Text>
+          </Animated.View>
+          <Text variant="bodyMedium" style={[styles.alertSubtitle, { color: theme.colors.onErrorContainer }]}>
+            {type === 'motion' ? 'Unerwartete Bewegung erkannt' : 'Manueller Alarm'}
           </Text>
-        </Animated.View>
-        <Text variant="bodyMedium" style={[styles.alertSubtitle, { color: theme.colors.onErrorContainer }]}>
-          {type === 'motion' ? 'Unerwartete Bewegung erkannt' : 'Manueller Alarm'}
-        </Text>
-        <Text variant="bodySmall" style={[styles.timestamp, { color: theme.colors.onErrorContainer }]}>
-          {formatDate(timestamp)}
-        </Text>
-      </Surface>
+          <Text variant="bodySmall" style={[styles.timestamp, { color: theme.colors.onErrorContainer }]}>
+            {formatDate(timestamp)}
+          </Text>
+        </Surface>
+      </View>
 
       {/* Kamera oder Foto */}
       <View style={styles.cameraContainer}>
-        {!capturedImages ? (
+        {!emergencyData ? (
           <View style={{ flex: 1 }}>
-            {/* Dual-Kamera View */}
-            <View style={{ flex: 1, flexDirection: 'row' }}>
+            {/* Frontkamera View */}
+            <View style={{ flex: 1 }}>
               <CameraView
                 ref={frontCameraRef}
-                style={[styles.camera, { flex: 1, marginRight: 2 }]}
+                style={styles.camera}
                 facing="front"
                 onCameraReady={handleFrontCameraReady}
               />
-              <CameraView
-                ref={backCameraRef}
-                style={[styles.camera, { flex: 1, marginLeft: 2 }]}
-                facing="back"
-                onCameraReady={handleBackCameraReady}
-              />
             </View>
             <View style={{ 
-              flexDirection: 'row', 
-              justifyContent: 'space-between', 
               padding: 8, 
               backgroundColor: 'rgba(0,0,0,0.7)' 
             }}>
-              <Text variant="bodySmall" style={{ color: 'white', flex: 1, textAlign: 'center' }}>
+              <Text variant="bodySmall" style={{ color: 'white', textAlign: 'center' }}>
                 Frontkamera {camerasReady.front ? '✅' : '⏳'}
-              </Text>
-              <Text variant="bodySmall" style={{ color: 'white', flex: 1, textAlign: 'center' }}>
-                Rückkamera {camerasReady.back ? '✅' : '⏳'}
               </Text>
             </View>
           </View>
         ) : (
           <View style={styles.photoContainer}>
             <Text variant="titleMedium" style={styles.photoTitle}>
-              📸 Dual-Kamera Fotos aufgenommen
+              🎥 Notfall-Video aufgenommen
             </Text>
-            {/* Hier würden die aufgenommenen Fotos angezeigt */}
-            <View style={[styles.photoPlaceholder, { backgroundColor: theme.colors.surfaceVariant }]}>
-              {capturedImages.frontImage && (
-                <Text variant="bodyMedium">
-                  📷 Frontkamera: {capturedImages.frontImage.uri.split('/').pop()}
+            {/* Hier würde das aufgenommene Video angezeigt */}
+            <View style={{ overflow: 'hidden', borderRadius: 8 }}>
+              <View style={[styles.photoPlaceholder, { backgroundColor: theme.colors.surfaceVariant }]}>
+                {emergencyData.frontVideo && (
+                  <Text variant="bodyMedium">
+                    🎥 Video: {emergencyData.frontVideo.uri.split('/').pop()}
+                  </Text>
+                )}
+                <Text variant="bodySmall" style={{ marginTop: 8 }}>
+                  Aufgenommen: {formatDate(emergencyData.timestamp)}
                 </Text>
-              )}
-              {capturedImages.backImage && (
-                <Text variant="bodyMedium">
-                  📷 Rückkamera: {capturedImages.backImage.uri.split('/').pop()}
+                <Text variant="bodySmall">
+                  Dauer: {emergencyData.frontVideo ? `${emergencyData.frontVideo.duration / 1000} Sekunden` : 'Unbekannt'}
                 </Text>
-              )}
-              <Text variant="bodySmall" style={{ marginTop: 8 }}>
-                Aufgenommen: {formatDate(capturedImages.timestamp)}
-              </Text>
+              </View>
             </View>
           </View>
         )}
@@ -457,7 +504,7 @@ export default function AlertScreen() {
       {/* Status und Aktionen */}
       <Card style={styles.actionCard}>
         <Card.Content>
-          {countdown > 0 && !capturedImages && (
+          {countdown > 0 && !emergencyData && (
             <>
               <Text variant="titleMedium" style={styles.countdownTitle}>
                 Foto wird automatisch aufgenommen in:
@@ -490,7 +537,7 @@ export default function AlertScreen() {
             </>
           )}
 
-          {capturedImages && (
+          {emergencyData && (
             <>
               {isSending ? (
                 <>
@@ -517,13 +564,7 @@ export default function AlertScreen() {
                       </Button>
                       <Button
                         mode="contained"
-                        onPress={() => {
-                          // Verwende das primäre Bild für Legacy-Unterstützung
-                          const primaryImage = capturedImages.backImage || capturedImages.frontImage;
-                          if (primaryImage) {
-                            sendToEmergencyContacts(primaryImage);
-                          }
-                        }}
+                        onPress={() => sendEmergencyVideoToContacts(emergencyData)}
                         style={styles.actionButton}
                         icon="send"
                       >
